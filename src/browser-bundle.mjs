@@ -60,25 +60,23 @@ export function buildBrowserBundle({ config, cssText }) {
 
   const cfg = boot.config || {};
   const root = document.documentElement;
+  root.removeAttribute('data-wl-animated-bg');
   const cleanups = [];
 
   if (!cfg.enabled) {
     root.removeAttribute('data-wl-active');
     root.removeAttribute('data-wl-preset');
-    root.removeAttribute('data-wl-animated-bg');
     root.removeAttribute('data-wl-running');
     for (const id of ['wl-theme-style', 'wl-metrics-pill', 'wl-metrics-popover', 'wl-settings-nav-btn', 'wl-settings-pane']) {
       const el = document.getElementById(id);
       if (el) el.remove();
     }
-    document.querySelectorAll('[data-wl-model], [data-wl-effort], [data-wl-perm], [data-wl-view-usage], [data-wl-view-usage-label], [data-wl-usage-bar], [data-wl-usage-pct]').forEach((el) => {
+    document.querySelectorAll('[data-wl-model], [data-wl-effort], [data-wl-perm], [data-wl-view-usage], [data-wl-view-usage-label]').forEach((el) => {
       el.removeAttribute('data-wl-model');
       el.removeAttribute('data-wl-effort');
       el.removeAttribute('data-wl-perm');
       el.removeAttribute('data-wl-view-usage');
       el.removeAttribute('data-wl-view-usage-label');
-      el.removeAttribute('data-wl-usage-bar');
-      el.removeAttribute('data-wl-usage-pct');
     });
     document.querySelectorAll('svg[data-wl-logo-enhanced="1"]').forEach((svg) => {
       if (svg.dataset.wlOrigSvg) svg.innerHTML = svg.dataset.wlOrigSvg;
@@ -91,7 +89,6 @@ export function buildBrowserBundle({ config, cssText }) {
   // 1. Mount CSS & theme attributes
   root.setAttribute('data-wl-active', '1');
   root.setAttribute('data-wl-preset', cfg.preset || 'cyberpunk');
-  root.setAttribute('data-wl-animated-bg', cfg.animatedBg ? '1' : '0');
 
   // 1a. Enhance top-left Antigravity vector logo with authentic rainbow gradient
   function enhanceAntigravityLogo() {
@@ -146,7 +143,6 @@ export function buildBrowserBundle({ config, cssText }) {
     if (/gemini\\s*\\d*(?:\\.\\d+)?\\s*argon/i.test(t)) return 'argon';
     if (/gemini\\s*\\d*(?:\\.\\d+)?\\s*hydrogen/i.test(t)) return 'hydrogen';
     if (/gemini\\s*\\d*(?:\\.\\d+)?\\s*flash/i.test(t)) return 'flash';
-    if (/\\bgemini\\b/i.test(t)) return 'gemini';
     if (/claude/i.test(t)) return 'claude';
     if (/\\bgpt\\b/i.test(t)) return 'gpt';
     return '';
@@ -253,49 +249,6 @@ export function buildBrowserBundle({ config, cssText }) {
         }
         tagEffortLabels(item);
       }
-
-      // Colorize model names, quota bars & remaining % inside View Usage / Models dialogs
-      const dialogs = document.querySelectorAll('[role="dialog"]');
-      for (const dlg of dialogs) {
-        dlg.querySelectorAll('[data-wl-usage-bar], [data-wl-usage-pct]').forEach((el) => {
-          el.removeAttribute('data-wl-usage-bar');
-          el.removeAttribute('data-wl-usage-pct');
-        });
-        const w = document.createTreeWalker(dlg, NodeFilter.SHOW_TEXT);
-        while (w.nextNode()) {
-          const node = w.currentNode;
-          const parentEl = node.parentElement;
-          if (!parentEl || parentEl.closest('#wl-settings-pane')) continue;
-          const val = (node.nodeValue || '').trim();
-          if (!val || val.length > 60) continue;
-          const kind = classifyModel(val);
-          if (!kind) continue;
-          parentEl.setAttribute('data-wl-model', kind);
-
-          // Find enclosing row/card that contains a progress bar or % text
-          let row = parentEl.parentElement;
-          for (let step = 0; step < 5 && row && row !== dlg; step++, row = row.parentElement) {
-            const hasBar = row.querySelector('[role="progressbar"], [style*="width:"]');
-            const hasPct = /\\d+\\s*%/.test(row.textContent || '');
-            if (!hasBar && !hasPct) continue;
-            row.querySelectorAll('[role="progressbar"] > div, [role="progressbar"] > span, [style*="width:"]').forEach((bar) => {
-              const r = bar.getBoundingClientRect();
-              if (r.height > 0 && r.height <= 18 && r.width > 0) {
-                bar.setAttribute('data-wl-usage-bar', kind);
-              }
-            });
-            const pw = document.createTreeWalker(row, NodeFilter.SHOW_TEXT);
-            while (pw.nextNode()) {
-              const pn = pw.currentNode;
-              const pTxt = (pn.nodeValue || '').trim();
-              if (/\\d+\\s*%/.test(pTxt) && pTxt.length <= 28 && pn.parentElement) {
-                pn.parentElement.setAttribute('data-wl-usage-pct', kind);
-              }
-            }
-            break;
-          }
-        }
-      }
     } catch {}
   }
 
@@ -312,7 +265,6 @@ export function buildBrowserBundle({ config, cssText }) {
             (n.querySelector && n.querySelector('[role="dialog"]'))
           ) {
             needSettings = true;
-            needModels = true;
           }
           if (
             (n.matches && n.matches('[role="menu"], [role="listbox"], [role="menuitem"], [role="menuitemradio"]')) ||
@@ -588,7 +540,6 @@ export function buildBrowserBundle({ config, cssText }) {
       '<div class="wl-toggle-list">' +
       sliderRow('blurPx', 'Desenfoque (Blur)', 'Intensidad del efecto cristal esmerilado en paneles y barra lateral.', blurPx, 0, 32, 'px') +
       sliderRow('panelOpacity', 'Opacidad del panel', 'Baja el porcentaje para dejar ver más el degradado de fondo.', panelOpacity, 40, 95, '%') +
-      toggleRow('animatedBg', 'Fondo animado suave', 'Movimiento lento del degradado de fondo (desactívalo para consumo cero).', cfg.animatedBg) +
       '</div>' +
       '<div class="wl-sp-section">Opciones</div>' +
       '<div class="wl-toggle-list">' +
@@ -703,9 +654,6 @@ export function buildBrowserBundle({ config, cssText }) {
             if (toggleBtn) {
               const key = toggleBtn.getAttribute('data-wl-toggle');
               cfg[key] = !cfg[key];
-              if (key === 'animatedBg') {
-                root.setAttribute('data-wl-animated-bg', cfg[key] ? '1' : '0');
-              }
               sendConfigPatch({ [key]: cfg[key] });
               pane.innerHTML = renderSettingsPaneHtml();
             }
