@@ -1,5 +1,5 @@
 /**
- * src/daemon.mjs — Lightweight zero-dependency CDP daemon for Antigravity Worldline
+ * src/daemon.mjs — Lightweight zero-dependency CDP daemon for Antigravity · Neon Themes
  */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -87,7 +87,8 @@ export async function discoverAntigravityTargets() {
           t.type === 'page' &&
           t.webSocketDebuggerUrl &&
           !String(t.url || '').startsWith('devtools://') &&
-          !String(t.url || '').startsWith('chrome-extension://')
+          !String(t.url || '').startsWith('chrome-extension://') &&
+          !String(t.url || '').startsWith('data:')
       );
       if (pages.length > 0) {
         return { port, targets: pages };
@@ -230,8 +231,8 @@ async function runDaemon() {
         const res = await sess.evalJs('typeof window.__wl_get_cid === "function" ? window.__wl_get_cid() : ""');
         if (res?.result?.value) sess.cascadeId = String(res.result.value);
       }
-      const wl = WORLDLINES[config.preset] || WORLDLINES['tokyo-night'];
-      const payload = metricsService.buildPayload(sess.cascadeId, wl.divergence);
+      const wl = WORLDLINES[config.preset] || WORLDLINES[DEFAULT_CONFIG.preset];
+      const payload = metricsService.buildPayload(sess.cascadeId, wl.code || wl.divergence);
       const sig = JSON.stringify(payload);
       if (sig === sess.lastMetricsSig) return;
       sess.lastMetricsSig = sig;

@@ -9,8 +9,9 @@ export function buildBrowserBundle({ config, cssText }) {
     cssText,
     worldlines: Object.values(WORLDLINES).map((w) => ({
       id: w.id,
+      code: w.code || w.divergence,
       name: w.name,
-      divergence: w.divergence,
+      divergence: w.code || w.divergence,
       tagline: w.tagline,
       swatches: w.swatches
     })),
@@ -24,10 +25,29 @@ export function buildBrowserBundle({ config, cssText }) {
   if (typeof window.__wl_cleanup === 'function') {
     try { window.__wl_cleanup(); } catch {}
   }
+  window.__wl_latest_metrics = null;
+  window.__wl_last_cid = '';
 
-  // Remove stale Worldline Settings nodes so updated layout mounts cleanly
+  // Preserve active Settings tab & scroll across hot-reloads
+  let restoreSettingsOpen = false;
+  let prevPaneScroll = 0;
+  let prevRightScroll = 0;
   try {
-    for (const oldId of ['wl-settings-nav-btn', 'wl-settings-pane']) {
+    const prevBtn = document.getElementById('wl-settings-nav-btn');
+    const prevPane = document.getElementById('wl-settings-pane');
+    restoreSettingsOpen = Boolean(
+      (prevBtn && prevBtn.getAttribute('data-active') === '1') ||
+      (prevPane && prevPane.style.display !== 'none')
+    );
+    if (prevPane) {
+      prevPaneScroll = prevPane.scrollTop || 0;
+      prevRightScroll = prevPane.parentElement ? (prevPane.parentElement.scrollTop || 0) : 0;
+    }
+  } catch {}
+
+  // Remove stale Settings & Metrics nodes so updated layout and listeners mount cleanly
+  try {
+    for (const oldId of ['wl-settings-nav-btn', 'wl-settings-pane', 'wl-metrics-pill', 'wl-metrics-popover']) {
       const el = document.getElementById(oldId);
       if (el) el.remove();
     }
@@ -57,24 +77,233 @@ export function buildBrowserBundle({ config, cssText }) {
 
   const cfg = boot.config || {};
   const root = document.documentElement;
+  root.removeAttribute('data-wl-animated-bg');
   const cleanups = [];
 
   if (!cfg.enabled) {
     root.removeAttribute('data-wl-active');
     root.removeAttribute('data-wl-preset');
-    root.removeAttribute('data-wl-zen');
     root.removeAttribute('data-wl-running');
     for (const id of ['wl-theme-style', 'wl-metrics-pill', 'wl-metrics-popover', 'wl-settings-nav-btn', 'wl-settings-pane']) {
       const el = document.getElementById(id);
       if (el) el.remove();
     }
+    document.querySelectorAll('[data-wl-model], [data-wl-effort], [data-wl-perm], [data-wl-view-usage], [data-wl-view-usage-label]').forEach((el) => {
+      el.removeAttribute('data-wl-model');
+      el.removeAttribute('data-wl-effort');
+      el.removeAttribute('data-wl-perm');
+      el.removeAttribute('data-wl-view-usage');
+      el.removeAttribute('data-wl-view-usage-label');
+    });
+    document.querySelectorAll('svg[data-wl-logo-enhanced="1"]').forEach((svg) => {
+      if (svg.dataset.wlOrigSvg) svg.innerHTML = svg.dataset.wlOrigSvg;
+      svg.removeAttribute('data-wl-logo-enhanced');
+      delete svg.dataset.wlOrigSvg;
+    });
     return;
   }
 
   // 1. Mount CSS & theme attributes
   root.setAttribute('data-wl-active', '1');
-  root.setAttribute('data-wl-preset', cfg.preset || 'tokyo-night');
-  root.setAttribute('data-wl-zen', cfg.zenMode ? '1' : '0');
+  root.setAttribute('data-wl-preset', cfg.preset || 'cyberpunk');
+
+  // 1a. Enhance top-left Antigravity vector logo with authentic rainbow gradient
+  function enhanceAntigravityLogo() {
+    try {
+      const svgs = document.querySelectorAll('button[data-testid="app-icon-new-conversation-button"] svg');
+      for (const svg of svgs) {
+        if (svg.getAttribute('data-wl-logo-enhanced') === '1') continue;
+        const paths = Array.from(svg.querySelectorAll('path'))
+          .map((p) => p.getAttribute('d') || '')
+          .filter(Boolean);
+        if (paths.length === 0) continue;
+        if (!svg.dataset.wlOrigSvg) svg.dataset.wlOrigSvg = svg.innerHTML;
+        const clipPaths = paths.map((d) => '<path d="' + d.replace(/"/g, '&quot;') + '"/>').join('');
+        svg.innerHTML =
+          '<defs>' +
+          '<clipPath id="wl-agy-logo-clip">' + clipPaths + '</clipPath>' +
+          '<radialGradient id="wl-agy-g-green" cx="50%" cy="50%" r="50%">' +
+          '<stop offset="0%" stop-color="#38d977" stop-opacity="0.95"/>' +
+          '<stop offset="68%" stop-color="#38d977" stop-opacity="0"/>' +
+          '</radialGradient>' +
+          '<radialGradient id="wl-agy-g-gold" cx="50%" cy="50%" r="50%">' +
+          '<stop offset="0%" stop-color="#facc15" stop-opacity="0.98"/>' +
+          '<stop offset="68%" stop-color="#facc15" stop-opacity="0"/>' +
+          '</radialGradient>' +
+          '<radialGradient id="wl-agy-g-coral" cx="50%" cy="50%" r="50%">' +
+          '<stop offset="0%" stop-color="#ff5a4e" stop-opacity="0.96"/>' +
+          '<stop offset="70%" stop-color="#ff5a4e" stop-opacity="0"/>' +
+          '</radialGradient>' +
+          '<radialGradient id="wl-agy-g-sky" cx="50%" cy="50%" r="50%">' +
+          '<stop offset="0%" stop-color="#2f88ff" stop-opacity="0.95"/>' +
+          '<stop offset="75%" stop-color="#2f88ff" stop-opacity="0"/>' +
+          '</radialGradient>' +
+          '</defs>' +
+          '<g clip-path="url(#wl-agy-logo-clip)">' +
+          '<rect width="180" height="180" fill="#2575fc"/>' +
+          '<circle cx="52" cy="78" r="68" fill="url(#wl-agy-g-green)"/>' +
+          '<circle cx="88" cy="34" r="54" fill="url(#wl-agy-g-gold)"/>' +
+          '<circle cx="122" cy="60" r="56" fill="url(#wl-agy-g-coral)"/>' +
+          '<circle cx="92" cy="118" r="78" fill="url(#wl-agy-g-sky)"/>' +
+          '</g>';
+        svg.setAttribute('data-wl-logo-enhanced', '1');
+      }
+    } catch {}
+  }
+
+  // 1b. Colorize model names, reasoning effort, Permissions pill & View Usage
+  function classifyModel(rawText) {
+    const t = String(rawText || '').trim();
+    if (!t) return '';
+    if (/gemini\\s*\\d*(?:\\.\\d+)?\\s*neon/i.test(t)) return 'neon';
+    if (/gemini\\s*\\d*(?:\\.\\d+)?\\s*carbon/i.test(t)) return 'carbon';
+    if (/gemini\\s*\\d*(?:\\.\\d+)?\\s*argon/i.test(t)) return 'argon';
+    if (/gemini\\s*\\d*(?:\\.\\d+)?\\s*hydrogen/i.test(t)) return 'hydrogen';
+    if (/gemini\\s*\\d*(?:\\.\\d+)?\\s*flash/i.test(t)) return 'flash';
+    if (/claude/i.test(t)) return 'claude';
+    if (/\\bgpt\\b/i.test(t)) return 'gpt';
+    return '';
+  }
+
+  function classifyEffort(rawText) {
+    const t = String(rawText || '').trim();
+    if (/^(?:extra[\\s_-]*high|x[\\s_-]*high)$/i.test(t)) return 'extra-high';
+    if (/^high$/i.test(t)) return 'high';
+    if (/^medium$/i.test(t)) return 'medium';
+    if (/^low$/i.test(t)) return 'low';
+    return '';
+  }
+
+  function classifyPermission(rawText) {
+    const t = String(rawText || '').trim();
+    if (/\\bturbo\\b/i.test(t)) return 'turbo';
+    if (/\\bauto\\b/i.test(t)) return 'auto';
+    if (/\\bstrict\\b/i.test(t)) return 'strict';
+    if (/\\bdefault\\b/i.test(t)) return 'default';
+    return '';
+  }
+
+  function findModelLabelSpan(container, fallbackEl) {
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      const val = (node.nodeValue || '').trim();
+      if (!val || /^(New|Leaving Soon|Notice|Low|Medium|High|Extra High|Orchestrator)$/i.test(val)) continue;
+      if (classifyModel(val)) {
+        return node.parentElement || fallbackEl;
+      }
+    }
+    return fallbackEl;
+  }
+
+  function tagEffortLabels(container) {
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      const val = (node.nodeValue || '').trim();
+      const effort = classifyEffort(val);
+      if (effort && node.parentElement && !node.parentElement.hasAttribute('data-wl-model')) {
+        node.parentElement.setAttribute('data-wl-effort', effort);
+      }
+    }
+  }
+
+  function tagModelElements() {
+    try {
+      const triggers = document.querySelectorAll('[data-testid="model-selector-trigger"]');
+      for (const trig of triggers) {
+        const raw = trig.getAttribute('data-model-label') || trig.textContent || '';
+        const kind = classifyModel(raw);
+        trig.querySelectorAll('[data-wl-model], [data-wl-effort]').forEach((el) => {
+          el.removeAttribute('data-wl-model');
+          el.removeAttribute('data-wl-effort');
+        });
+        if (kind) {
+          const targetSpan = findModelLabelSpan(trig, trig);
+          targetSpan.setAttribute('data-wl-model', kind);
+        }
+        tagEffortLabels(trig);
+      }
+
+      const permTrigs = document.querySelectorAll('[data-testid="permissions-selector-trigger"]');
+      for (const pt of permTrigs) {
+        const pKind = classifyPermission(pt.textContent || '');
+        if (pKind) pt.setAttribute('data-wl-perm', pKind);
+        else pt.removeAttribute('data-wl-perm');
+      }
+
+      const menuItems = document.querySelectorAll('[role="menu"] [role="menuitem"], [role="menu"] [role="menuitemradio"], [role="listbox"] [role="option"]');
+      for (const item of menuItems) {
+        const txt = (item.textContent || '').trim();
+        item.querySelectorAll('[data-wl-model], [data-wl-effort], [data-wl-view-usage-label]').forEach((el) => {
+          el.removeAttribute('data-wl-model');
+          el.removeAttribute('data-wl-effort');
+          el.removeAttribute('data-wl-view-usage-label');
+        });
+        item.removeAttribute('data-wl-view-usage');
+        item.removeAttribute('data-wl-perm');
+
+        if (/view\\s*usage/i.test(txt)) {
+          item.setAttribute('data-wl-view-usage', '1');
+          const walker = document.createTreeWalker(item, NodeFilter.SHOW_TEXT);
+          while (walker.nextNode()) {
+            const val = (walker.currentNode.nodeValue || '').trim();
+            if (/view\\s*usage/i.test(val) && walker.currentNode.parentElement) {
+              walker.currentNode.parentElement.setAttribute('data-wl-view-usage-label', '1');
+              break;
+            }
+          }
+          continue;
+        }
+
+        const kind = classifyModel(txt);
+        if (kind) {
+          const labelEl = findModelLabelSpan(item, item);
+          labelEl.setAttribute('data-wl-model', kind);
+        } else {
+          const pKind = classifyPermission(txt);
+          if (pKind) item.setAttribute('data-wl-perm', pKind);
+        }
+        tagEffortLabels(item);
+      }
+    } catch {}
+  }
+
+  if (document.body && typeof MutationObserver !== 'undefined') {
+    const uiObserver = new MutationObserver((muts) => {
+      let needModels = false;
+      let needSettings = false;
+      let needLogo = false;
+      for (const m of muts) {
+        for (const n of m.addedNodes) {
+          if (n.nodeType !== 1) continue;
+          if (
+            (n.matches && n.matches('[role="dialog"]')) ||
+            (n.querySelector && n.querySelector('[role="dialog"]'))
+          ) {
+            needSettings = true;
+          }
+          if (
+            (n.matches && n.matches('[role="menu"], [role="listbox"], [role="menuitem"], [role="menuitemradio"]')) ||
+            (n.querySelector && n.querySelector('[role="menu"], [role="listbox"], [data-testid="model-selector-trigger"], [data-testid="permissions-selector-trigger"]'))
+          ) {
+            needModels = true;
+          }
+          if (
+            (n.matches && n.matches('[data-testid="app-icon-new-conversation-button"]')) ||
+            (n.querySelector && n.querySelector('[data-testid="app-icon-new-conversation-button"]'))
+          ) {
+            needLogo = true;
+          }
+        }
+      }
+      if (needLogo) enhanceAntigravityLogo();
+      if (needSettings) mountSettingsEntry();
+      if (needModels) tagModelElements();
+    });
+    uiObserver.observe(document.body, { childList: true, subtree: true });
+    cleanups.push(() => uiObserver.disconnect());
+  }
 
   let styleEl = document.getElementById('wl-theme-style');
   if (!styleEl) {
@@ -92,14 +321,9 @@ export function buildBrowserBundle({ config, cssText }) {
     }
   }
 
-  // 2. Zen Mode shortcut (Ctrl + Shift + Z)
+  // 2. Escape closes metrics popover
   const onKeyDown = (e) => {
-    if (e.ctrlKey && e.shiftKey && String(e.key || '').toLowerCase() === 'z') {
-      e.preventDefault();
-      const nextZen = root.getAttribute('data-wl-zen') !== '1';
-      root.setAttribute('data-wl-zen', nextZen ? '1' : '0');
-      sendConfigPatch({ zenMode: nextZen });
-    } else if (e.key === 'Escape') {
+    if (e.key === 'Escape') {
       closePopover();
     }
   };
@@ -273,19 +497,21 @@ export function buildBrowserBundle({ config, cssText }) {
       pill.innerHTML = payload.pillHtml;
     }
     const pop = document.getElementById('wl-metrics-popover');
-    if (pop && pop.getAttribute('data-visible') === '1' && payload.popoverHtml) {
+    if (pop && payload.popoverHtml) {
       pop.innerHTML = payload.popoverHtml;
-      if (pill) positionPopover(pill, pop);
+      if (pill && pop.getAttribute('data-visible') === '1') {
+        positionPopover(pill, pop);
+      }
     }
   };
 
-  // 5. Simple Settings -> Worldline Tab (in Spanish)
+  // 5. Simple Settings -> Neon Themes Tab (in Spanish)
   function renderSettingsPaneHtml() {
     const presetCards = boot.worldlines
       .map(
         (w) =>
           '<button type="button" class="wl-preset-card" data-wl-pick-preset="' + w.id + '" data-selected="' + (cfg.preset === w.id ? '1' : '0') + '">' +
-          '<div class="wl-preset-top"><span class="wl-preset-name">' + w.name + '</span><span class="wl-preset-div">' + w.divergence + '</span></div>' +
+          '<div class="wl-preset-top"><span class="wl-preset-name">' + w.name + '</span></div>' +
           '<div class="wl-preset-desc">' + w.tagline + '</div>' +
           '<div class="wl-swatches">' + w.swatches.map((c) => '<span class="wl-swatch" style="background:' + c + '"></span>').join('') + '</div>' +
           '</button>'
@@ -296,7 +522,7 @@ export function buildBrowserBundle({ config, cssText }) {
       .map(
         (a) =>
           '<button type="button" class="wl-accent-btn" data-wl-pick-accent="' + a.id + '" data-selected="' + (cfg.accent === a.id ? '1' : '0') + '">' +
-          (a.color ? '<span class="wl-accent-dot" style="background:' + a.color + '"></span>' : '') +
+          '<span class="wl-accent-dot" style="background:' + (a.color || 'var(--wl-accent)') + '"></span>' +
           '<span>' + a.label + '</span></button>'
       )
       .join('');
@@ -307,20 +533,35 @@ export function buildBrowserBundle({ config, cssText }) {
       '<button type="button" class="wl-switch" data-wl-toggle="' + key + '" data-on="' + (isOn ? '1' : '0') + '"></button>' +
       '</div>';
 
+    const sliderRow = (key, title, desc, value, min, max, unit) =>
+      '<div class="wl-slider-row">' +
+      '<div class="wl-slider-top">' +
+      '<div><div class="wl-toggle-title">' + title + '</div><div class="wl-toggle-desc">' + desc + '</div></div>' +
+      '<span class="wl-slider-val" data-wl-val-for="' + key + '">' + value + ' ' + unit + '</span>' +
+      '</div>' +
+      '<input type="range" class="wl-range" data-wl-range="' + key + '" data-wl-unit="' + unit + '" min="' + min + '" max="' + max + '" step="1" value="' + value + '" />' +
+      '</div>';
+
     const activeWl = boot.worldlines.find((w) => w.id === cfg.preset) || boot.worldlines[0];
+    const blurPx = Number.isFinite(Number(cfg.blurPx)) ? Number(cfg.blurPx) : 18;
+    const panelOpacity = Number.isFinite(Number(cfg.panelOpacity)) ? Number(cfg.panelOpacity) : 72;
 
     return (
-      '<h2 class="wl-sp-title">Worldline <span class="wl-div-badge">' + activeWl.divergence + '</span></h2>' +
-      '<p class="wl-sp-sub">Cambia la apariencia de Antigravity y el medidor de tokens Gemini al instante.</p>' +
-      '<div class="wl-sp-section">Línea de mundo (Tema)</div>' +
+      '<h2 class="wl-sp-title"><span class="wl-dot"></span><span>Antigravity · Neon Themes</span> <span class="wl-div-badge">' + activeWl.code + '</span></h2>' +
+      '<p class="wl-sp-sub">Personaliza la apariencia de Antigravity y el medidor de tokens Gemini al instante.</p>' +
+      '<div class="wl-sp-section">Future Gadgets</div>' +
       '<div class="wl-preset-grid">' + presetCards + '</div>' +
       '<div class="wl-sp-section">Color de acento</div>' +
       '<div class="wl-accent-row">' + accentBtns + '</div>' +
+      '<div class="wl-sp-section">Cristal y fondo</div>' +
+      '<div class="wl-toggle-list">' +
+      sliderRow('blurPx', 'Desenfoque (Blur)', 'Intensidad del efecto cristal esmerilado en paneles y barra lateral.', blurPx, 0, 32, 'px') +
+      sliderRow('panelOpacity', 'Opacidad del panel', 'Baja el porcentaje para dejar ver más el degradado de fondo.', panelOpacity, 40, 95, '%') +
+      '</div>' +
       '<div class="wl-sp-section">Opciones</div>' +
       '<div class="wl-toggle-list">' +
       toggleRow('showMetrics', 'Barra de tokens Gemini', 'Muestra memoria libre del chat y gráfica semanal de los modelos Gemini.', cfg.showMetrics) +
       toggleRow('cleanFont', 'Tipografía limpia', 'Usa Inter / JetBrains Mono para texto y bloques de código.', cfg.cleanFont) +
-      toggleRow('zenMode', 'Modo Zen (Ctrl+Shift+Z)', 'Oculta la barra lateral izquierda para centrarte solo en el chat.', cfg.zenMode) +
       '</div>'
     );
   }
@@ -362,7 +603,10 @@ export function buildBrowserBundle({ config, cssText }) {
 
   function mountSettingsEntry() {
     const dialog = document.querySelector('[role="dialog"]');
-    if (!dialog) return;
+    if (!dialog) {
+      restoreSettingsOpen = false;
+      return;
+    }
 
     const navButtons = Array.from(dialog.querySelectorAll('button, a'));
     const appearanceBtn = navButtons.find((b) => /^Appearance$/i.test((b.textContent || '').trim()));
@@ -381,7 +625,7 @@ export function buildBrowserBundle({ config, cssText }) {
       btn = document.createElement('button');
       btn.id = 'wl-settings-nav-btn';
       btn.type = 'button';
-      btn.innerHTML = '<span>✦</span><span>Worldline</span>';
+      btn.innerHTML = '<span>✦</span><span>Neon Themes</span>';
       navList.appendChild(btn);
 
       const closeWorldlinePane = () => {
@@ -434,6 +678,29 @@ export function buildBrowserBundle({ config, cssText }) {
               pane.innerHTML = renderSettingsPaneHtml();
             }
           });
+          pane.addEventListener('input', (ev) => {
+            const range = ev.target.closest('[data-wl-range]');
+            if (!range) return;
+            const key = range.getAttribute('data-wl-range');
+            const unit = range.getAttribute('data-wl-unit') || '';
+            const val = Number(range.value);
+            cfg[key] = val;
+            const lbl = pane.querySelector('[data-wl-val-for="' + key + '"]');
+            if (lbl) lbl.textContent = val + ' ' + unit;
+            if (key === 'blurPx') {
+              root.style.setProperty('--wl-blur', val + 'px');
+            } else if (key === 'panelOpacity') {
+              root.style.setProperty('--wl-panel-alpha', (val / 100).toFixed(2));
+            }
+          });
+          pane.addEventListener('change', (ev) => {
+            const range = ev.target.closest('[data-wl-range]');
+            if (!range) return;
+            const key = range.getAttribute('data-wl-range');
+            const val = Number(range.value);
+            cfg[key] = val;
+            sendConfigPatch({ [key]: val });
+          });
         }
         pane.style.display = 'block';
         pane.innerHTML = renderSettingsPaneHtml();
@@ -447,23 +714,39 @@ export function buildBrowserBundle({ config, cssText }) {
 
       if (!leftCol.getAttribute('data-wl-nav-bound')) {
         leftCol.setAttribute('data-wl-nav-bound', '1');
-        leftCol.addEventListener('click', (e) => {
+        const onLeftNavClick = (e) => {
           if (e.target && e.target.closest && e.target.closest('#wl-settings-nav-btn')) return;
           if (e.target && e.target.closest && e.target.closest('button, a')) {
             closeWorldlinePane();
           }
-        });
+        };
+        leftCol.addEventListener('click', onLeftNavClick);
+        cleanups.push(() => leftCol.removeEventListener('click', onLeftNavClick));
+      }
+
+      if (restoreSettingsOpen) {
+        restoreSettingsOpen = false;
+        openWorldlinePane();
+        const pane = document.getElementById('wl-settings-pane');
+        if (pane && prevPaneScroll) pane.scrollTop = prevPaneScroll;
+        if (prevRightScroll) rightCol.scrollTop = prevRightScroll;
       }
     }
   }
 
   // 6. Lightweight periodic sync for SPA navigation & Settings modal
   const tick = () => {
+    enhanceAntigravityLogo();
+    tagModelElements();
     mountMetricsPill();
     mountSettingsEntry();
     const cid = getActiveCascadeId();
     if (cid !== window.__wl_last_cid) {
       window.__wl_last_cid = cid;
+      latestMetrics = null;
+      window.__wl_latest_metrics = null;
+      const pop = document.getElementById('wl-metrics-popover');
+      if (pop) pop.innerHTML = '';
       if (typeof window.__wlRequestMetrics === 'function') {
         try { window.__wlRequestMetrics(cid); } catch {}
       }

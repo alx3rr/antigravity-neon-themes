@@ -67,6 +67,25 @@ export function isGeminiModel(name) {
   return /gemini/i.test(String(name || ''));
 }
 
+export function extractMaxStepIdx(raw) {
+  if (typeof raw === 'number') return raw >= 0 ? raw : -1;
+  if (!raw || typeof raw.length !== 'number' || raw.length === 0) return -1;
+  let i = 0;
+  let maxVal = -1;
+  while (i < raw.length) {
+    let val = 0;
+    let s = 0;
+    while (i < raw.length) {
+      const b = raw[i++];
+      val += (b & 0x7f) * Math.pow(2, s);
+      if (!(b & 0x80)) break;
+      s += 7;
+    }
+    if (val > maxVal) maxVal = val;
+  }
+  return maxVal;
+}
+
 export function parseGenMetadataRow(row) {
   const top = parseProto(row.data);
   const chat = top.has(1) ? parseProto(top.get(1)) : new Map();
@@ -82,6 +101,7 @@ export function parseGenMetadataRow(row) {
   const cacheWrite = usage.get(4) || 0;
   const cacheRead = usage.get(5) || 0;
   const maxCtx = ctxMeta.get(4) || 0;
+  const maxStepIdx = extractMaxStepIdx(top.get(2));
   const ttft = (ttftMap.get(1) || 0) + (ttftMap.get(2) || 0) / 1e9;
   const stream = (streamMap.get(1) || 0) + (streamMap.get(2) || 0) / 1e9;
 
@@ -98,6 +118,7 @@ export function parseGenMetadataRow(row) {
     cacheRead,
     ctx: inTok + cacheWrite + cacheRead,
     maxCtx,
+    maxStepIdx,
     modelName: cleanModelName(rawModel),
     ttft,
     stream,

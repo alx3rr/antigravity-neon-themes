@@ -1,6 +1,6 @@
-# Antigravity Worldline `1.048596`
+# Antigravity · Neon Themes
 
-> Cambia de *línea de mundo* en **Google Antigravity** — 4 temas curados (**Tokyo Night**, **Cyberpunk**, **Border Sunset** y **Border Translucent**) + monitor de tokens y actividad semanal **solo para modelos Gemini**.
+> Personaliza **Google Antigravity** con 3 temas estilo **Future Gadgets** (**FG-009 · Obsidian Border**, **FG-010 · Cyberpunk** y **FG-011 · Sunset**) + monitor de tokens y actividad semanal **solo para modelos Gemini**.
 
 Sin dependencias externas (`npm install` no es necesario), 100 % en español, ligero y sin modificar los binarios de Antigravity.
 
@@ -8,26 +8,27 @@ Sin dependencias externas (`npm install` no es necesario), 100 % en español, li
 
 ## Qué incluye
 
-### 4 líneas de mundo (temas)
+### Future Gadgets (Temas)
 | Tema | Inspiración | Estética |
 | :--- | :--- | :--- |
-| **Tokyo Night** | Tokyo Night (VS Code) | Azul noche limpio, bordes finos y contraste cómodo para horas de uso. |
-| **Cyberpunk** | SynthWave '84 | Fondo oscuro violáceo con acentos cian/magenta y brillo neón en la caja activa. |
-| **Border Sunset** | Obsidian Border (*Sunset*) | Tarjetas nítidas con paleta oscura cálida y tonos atardecer ámbar/coral. |
-| **Border Translucent** | Obsidian Border (*Translucent*) | Paneles estilo cristal esmerilado (`backdrop-filter: blur`) sobre fondo degradado profundo. |
+| **FG-009 · Obsidian Border** | Obsidian Border (*Translucent*) | Cristal esmerilado con fondo degradado rosa, morado y azul estilo neón. |
+| **FG-010 · Cyberpunk** | SynthWave '84 | Lienzo índigo-violeta unificado sin bordes con acento neón magenta y cian. |
+| **FG-011 · Sunset** | Obsidian Border (*Sunset*) | Lienzo espresso oscuro con brillo cálido dorado, ámbar y rosa desde la parte inferior. |
 
-### Medidor de Divergencia (solo modelos Gemini)
+### Medidor Gemini (solo modelos Gemini)
 Pasa el ratón (o haz clic para fijarlo) sobre la barra inferior del chat para ver:
 * **Memoria restante del chat actual** (`% libre` + barra verde → amarilla → roja).
 * **Resumen humano del último turno:** velocidad (`tok/s`), tokens generados y `%` de caché reutilizada.
-* **Gráfica semanal Gemini (`L M X J V S D`):** consumo diario de los últimos 7 días con línea de ritmo proyectado y desglose por modelo Gemini.
+* **Gráfica semanal Gemini (`D L M X J V S`):** consumo diario de los últimos 7 días con línea de ritmo proyectado y desglose por modelo Gemini.
 
-### Ajustes simples en `Settings → Worldline`
-* Cambio de tema en vivo con 1 clic.
+### Ajustes simples en `Settings → Neon Themes`
+* Selector rápido de **Future Gadgets** con 1 clic.
 * Selector de **color de acento** (o automático del tema).
+* Controles de **desenfoque (Blur)** y **opacidad del panel** en tiempo real.
+* Colores diferenciados en el selector de modelos y niveles de esfuerzo (con efecto neón animado en **Gemini 4 Neon** y botón **View Usage** destacado).
+* Logotipo vectorial arcoíris de Antigravity, pill de permisos por color (`Turbo`, `Auto`, `Default`, `Strict`) y botones neón de envío/parada.
 * **Tipografía limpia** (estilo Inter + JetBrains Mono).
-* **Modo Zen** (`Ctrl + Shift + Z`) para ocultar la barra lateral.
-* Activar/desactivar la barra de tokens Gemini.
+* Activar/desactivar la barra de tokens Gemini (conservando la pestaña activa al cambiar opciones).
 
 ---
 
@@ -38,8 +39,8 @@ Pasa el ratón (o haz clic para fijarlo) sobre la barra inferior del chat para v
 ## Instalación
 
 ```bash
-git clone https://github.com/alx3rr/antigravity-worldline.git
-cd antigravity-worldline
+git clone https://github.com/alx3rr/antigravity-neon-themes.git
+cd antigravity-neon-themes
 node cli.mjs install
 node cli.mjs relaunch
 ```
