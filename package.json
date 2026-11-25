@@ -1,7 +1,7 @@
 {
-  "name": "antigravity-worldline",
+  "name": "antigravity-neon-themes",
   "version": "1.0.0",
-  "description": "Temas visuales (Border Translucent, Border Sunset & Cyberpunk Borderless) y monitor de tokens Gemini para Google Antigravity, inspirado en Steins;Gate.",
+  "description": "Temas visuales Future Gadgets (Obsidian Border, Cyberpunk & Sunset) y monitor de tokens Gemini para Google Antigravity.",
   "type": "module",
   "main": "cli.mjs",
   "scripts": {
@@ -16,6 +16,8 @@
   "keywords": [
     "antigravity",
     "google-antigravity",
+    "neon-themes",
+    "future-gadget",
     "theme",
     "cyberpunk",
     "obsidian-border",

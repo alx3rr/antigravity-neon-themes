@@ -1,12 +1,13 @@
 /**
- * src/themes.mjs — 3 curated Worldline presets + clean CSS generator for Google Antigravity
+ * src/themes.mjs — 3 curated Future Gadget presets + clean CSS generator for Antigravity · Neon Themes
  */
 
 export const WORLDLINES = {
   'border-translucent': {
     id: 'border-translucent',
-    name: 'Border Translucent',
-    divergence: '1.130205',
+    code: 'FG-009',
+    name: 'FG-009 · Obsidian Border',
+    divergence: 'FG-009',
     tagline: 'Cristal esmerilado con fondo degradado rosa, morado y azul estilo neón',
     swatches: ['#111328', '#3b82f6', '#a855f7', '#ec4899'],
     vars: {
@@ -55,62 +56,11 @@ export const WORLDLINES = {
       '--glass-border': 'rgba(255, 255, 255, 0.14)'
     }
   },
-  'border-sunset': {
-    id: 'border-sunset',
-    name: 'Border Sunset',
-    divergence: '0.337187',
-    tagline: 'Lienzo espresso con resplandor cálido dorado, ámbar y rosa de atardecer',
-    swatches: ['#1d1519', '#e85d75', '#f59e42', '#e2a155'],
-    vars: {
-      '--wl-bg': '#1d1519',
-      '--wl-bg-gradient':
-        'radial-gradient(ellipse 95% 48% at 50% 104%, rgba(245, 158, 66, 0.68), rgba(224, 102, 72, 0.36) 44%, transparent 74%), radial-gradient(ellipse 60% 45% at 10% 72%, rgba(232, 93, 117, 0.38), transparent 65%), radial-gradient(ellipse 55% 40% at 88% 20%, rgba(168, 85, 122, 0.24), transparent 60%), linear-gradient(180deg, #1d1519 0%, #2a1b1d 60%, #3a221d 100%)',
-      '--wl-pane-rgb': '31, 23, 24',
-      '--wl-pane-border': 'rgba(255, 196, 155, 0.20)',
-      '--wl-sidebar-tint': 'rgba(26, 19, 20, 0.34)',
-      '--wl-popover-bg': 'rgba(31, 23, 24, 0.93)',
-      '--wl-sidebar': 'transparent',
-      '--wl-surface': 'rgba(36, 26, 27, 0.76)',
-      '--wl-surface-2': 'rgba(48, 35, 36, 0.84)',
-      '--wl-surface-hover': 'rgba(64, 46, 46, 0.88)',
-      '--wl-border': 'rgba(255, 196, 155, 0.18)',
-      '--wl-border-strong': 'rgba(245, 158, 66, 0.52)',
-      '--wl-text': '#f7ede8',
-      '--wl-text-muted': '#bea39d',
-      '--wl-accent': '#f59e42',
-      '--wl-accent-2': '#e85d75',
-      '--wl-accent-soft': 'rgba(245, 158, 66, 0.22)',
-      '--wl-row-active-bg': 'linear-gradient(90deg, rgba(245, 158, 66, 0.28), rgba(232, 93, 117, 0.16))',
-      '--wl-row-active-border': 'rgba(245, 158, 66, 0.38)',
-      '--wl-heading-bar': '#f59e42',
-      '--wl-link': '#f29f74',
-      '--wl-glow': '0 8px 28px rgba(0, 0, 0, 0.35), 0 0 24px rgba(245, 158, 66, 0.20)',
-      '--wl-code-bg': 'rgba(20, 15, 16, 0.80)',
-      '--wl-radius': '16px',
-      '--wl-ok': '#8fd18b',
-      '--wl-warn': '#f59e42',
-      '--wl-crit': '#e85d75',
-      // Native Antigravity CSS variables
-      '--background': 'transparent',
-      '--color-background': 'transparent',
-      '--body-background': 'transparent',
-      '--shell-canvas': 'transparent',
-      '--sidebar': 'transparent',
-      '--color-sidebar': 'transparent',
-      '--card': 'rgba(31, 23, 24, 0.76)',
-      '--card-border': 'rgba(255, 196, 155, 0.20)',
-      '--border': 'rgba(255, 196, 155, 0.18)',
-      '--primary': '#f59e42',
-      '--muted': 'rgba(255, 196, 155, 0.07)',
-      '--sidebar-secondary': 'rgba(245, 158, 66, 0.22)',
-      '--sidebar-muted': 'rgba(255, 196, 155, 0.07)',
-      '--glass-border': 'rgba(255, 196, 155, 0.20)'
-    }
-  },
   cyberpunk: {
     id: 'cyberpunk',
-    name: 'Cyberpunk Borderless',
-    divergence: '0.571024',
+    code: 'FG-010',
+    name: 'FG-010 · Cyberpunk',
+    divergence: 'FG-010',
     tagline: 'Lienzo índigo-violeta unificado sin bordes con brillo neón magenta y cian',
     swatches: ['#1b1836', '#8b5cf6', '#d946ef', '#00f0ff'],
     vars: {
@@ -157,6 +107,59 @@ export const WORLDLINES = {
       '--sidebar-secondary': 'rgba(192, 38, 211, 0.24)',
       '--sidebar-muted': 'rgba(155, 135, 245, 0.08)',
       '--glass-border': 'rgba(155, 135, 245, 0.18)'
+    }
+  },
+  'border-sunset': {
+    id: 'border-sunset',
+    code: 'FG-011',
+    name: 'FG-011 · Sunset',
+    divergence: 'FG-011',
+    tagline: 'Lienzo espresso con resplandor cálido dorado, ámbar y rosa de atardecer',
+    swatches: ['#1d1519', '#e85d75', '#f59e42', '#e2a155'],
+    vars: {
+      '--wl-bg': '#1d1519',
+      '--wl-bg-gradient':
+        'radial-gradient(ellipse 95% 48% at 50% 104%, rgba(245, 158, 66, 0.68), rgba(224, 102, 72, 0.36) 44%, transparent 74%), radial-gradient(ellipse 60% 45% at 10% 72%, rgba(232, 93, 117, 0.38), transparent 65%), radial-gradient(ellipse 55% 40% at 88% 20%, rgba(168, 85, 122, 0.24), transparent 60%), linear-gradient(180deg, #1d1519 0%, #2a1b1d 60%, #3a221d 100%)',
+      '--wl-pane-rgb': '31, 23, 24',
+      '--wl-pane-border': 'rgba(255, 196, 155, 0.20)',
+      '--wl-sidebar-tint': 'rgba(26, 19, 20, 0.34)',
+      '--wl-popover-bg': 'rgba(31, 23, 24, 0.93)',
+      '--wl-sidebar': 'transparent',
+      '--wl-surface': 'rgba(36, 26, 27, 0.76)',
+      '--wl-surface-2': 'rgba(48, 35, 36, 0.84)',
+      '--wl-surface-hover': 'rgba(64, 46, 46, 0.88)',
+      '--wl-border': 'rgba(255, 196, 155, 0.18)',
+      '--wl-border-strong': 'rgba(245, 158, 66, 0.52)',
+      '--wl-text': '#f7ede8',
+      '--wl-text-muted': '#bea39d',
+      '--wl-accent': '#f59e42',
+      '--wl-accent-2': '#e85d75',
+      '--wl-accent-soft': 'rgba(245, 158, 66, 0.22)',
+      '--wl-row-active-bg': 'linear-gradient(90deg, rgba(245, 158, 66, 0.28), rgba(232, 93, 117, 0.16))',
+      '--wl-row-active-border': 'rgba(245, 158, 66, 0.38)',
+      '--wl-heading-bar': '#f59e42',
+      '--wl-link': '#f29f74',
+      '--wl-glow': '0 8px 28px rgba(0, 0, 0, 0.35), 0 0 24px rgba(245, 158, 66, 0.20)',
+      '--wl-code-bg': 'rgba(20, 15, 16, 0.80)',
+      '--wl-radius': '16px',
+      '--wl-ok': '#8fd18b',
+      '--wl-warn': '#f59e42',
+      '--wl-crit': '#e85d75',
+      // Native Antigravity CSS variables
+      '--background': 'transparent',
+      '--color-background': 'transparent',
+      '--body-background': 'transparent',
+      '--shell-canvas': 'transparent',
+      '--sidebar': 'transparent',
+      '--color-sidebar': 'transparent',
+      '--card': 'rgba(31, 23, 24, 0.76)',
+      '--card-border': 'rgba(255, 196, 155, 0.20)',
+      '--border': 'rgba(255, 196, 155, 0.18)',
+      '--primary': '#f59e42',
+      '--muted': 'rgba(255, 196, 155, 0.07)',
+      '--sidebar-secondary': 'rgba(245, 158, 66, 0.22)',
+      '--sidebar-muted': 'rgba(255, 196, 155, 0.07)',
+      '--glass-border': 'rgba(255, 196, 155, 0.20)'
     }
   }
 };
@@ -288,11 +291,13 @@ html[data-wl-preset="cyberpunk"] [id="antigravity.agentSidePanelInputBox"]:focus
 }
 `;
 
-  return `/* Antigravity Worldline · ${wl.name} (${wl.divergence}) */
+  return `/* Antigravity · Neon Themes · ${wl.name} */
 :root,
 html[data-wl-active="1"],
 html[data-wl-active="1"] body,
-html[data-wl-active="1"] body[data-agy-theme] {
+html[data-wl-active="1"] body[data-agy-theme],
+html[data-wl-active="1"] .agy-shell,
+html[data-wl-active="1"] .agy-inset-shell {
 ${varDecls}
 }
 
@@ -309,18 +314,34 @@ html[data-wl-active="1"] .agy-shell {
 
 html[data-wl-active="1"] .agy-inset-shell,
 html[data-wl-active="1"] .agy-inset-shell > div:not(.bg-sidebar),
-html[data-wl-active="1"] [data-testid="conversation-view"] {
+html[data-wl-active="1"] [data-testid="conversation-view"],
+html[data-wl-active="1"] [class*="shell-canvas"],
+html[data-wl-active="1"] div:has(> [data-testid="toggle-aux-sidebar"]) {
   background: transparent !important;
 }
 
-/* Sidebar — glass tint without touching conversation navigator or breadcrumb */
+/* Sidebar — glass tint only on outer sidebar container */
 html[data-wl-active="1"] aside,
 html[data-wl-active="1"] [data-testid="sidebar"],
-html[data-wl-active="1"] .bg-sidebar {
+html[data-wl-active="1"] .agy-inset-shell > div > .bg-sidebar,
+html[data-wl-active="1"] .bg-sidebar:has([data-testid="conversation-list-sidebar"]) {
   background: var(--wl-sidebar-tint, transparent) !important;
   border-color: var(--wl-border) !important;
   backdrop-filter: blur(var(--wl-blur)) saturate(1.25) !important;
   -webkit-backdrop-filter: blur(var(--wl-blur)) saturate(1.25) !important;
+}
+
+/* Remove stacked dark boxes behind Projects, FSO, Conversations & top menu bar */
+html[data-wl-active="1"] [data-testid="section-header"],
+html[data-wl-active="1"] [data-testid="section-header"] .bg-sidebar,
+html[data-wl-active="1"] .bg-sidebar:has(> [data-testid="section-header"]),
+html[data-wl-active="1"] [data-testid="conversation-list-sidebar"] .bg-sidebar,
+html[data-wl-active="1"] [data-testid="project-header"],
+html[data-wl-active="1"] [data-testid="title-menu-bar"],
+html[data-wl-active="1"] .shrink-0.flex.bg-sidebar {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 html[data-wl-active="1"] nav[data-testid="conversation-navigator"],
@@ -460,12 +481,30 @@ html[data-wl-active="1"] [data-wl-model="neon"] {
   filter: drop-shadow(0 0 6px rgba(0, 245, 255, 0.42));
   animation: wl-neon-flow 4s linear infinite;
 }
-html[data-wl-active="1"] [data-wl-model="carbon"] { color: #cbd5e1 !important; font-weight: 600 !important; }
+html[data-wl-active="1"] [data-wl-model="carbon"] {
+  background: linear-gradient(90deg, #94a3b8 0%, #f1f5f9 50%, #5eead4 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+  font-weight: 600 !important;
+  filter: drop-shadow(0 0 4px rgba(94, 234, 212, 0.28));
+}
 html[data-wl-active="1"] [data-wl-model="argon"] { color: #818cf8 !important; font-weight: 600 !important; }
 html[data-wl-active="1"] [data-wl-model="hydrogen"] { color: #38bdf8 !important; font-weight: 600 !important; }
 html[data-wl-active="1"] [data-wl-model="flash"] { color: #fbbf24 !important; font-weight: 600 !important; }
 html[data-wl-active="1"] [data-wl-model="claude"] { color: #fb923c !important; font-weight: 600 !important; }
 html[data-wl-active="1"] [data-wl-model="gpt"] { color: #34d399 !important; font-weight: 600 !important; }
+
+/* Reasoning Effort Colors (Low / Medium / High / Extra High) */
+html[data-wl-active="1"] [data-wl-effort="low"] { color: #4ade80 !important; font-weight: 600 !important; }
+html[data-wl-active="1"] [data-wl-effort="medium"] { color: #60a5fa !important; font-weight: 600 !important; }
+html[data-wl-active="1"] [data-wl-effort="high"] { color: #f59e0b !important; font-weight: 600 !important; }
+html[data-wl-active="1"] [data-wl-effort="extra-high"] {
+  color: #f43f5e !important;
+  font-weight: 700 !important;
+  filter: drop-shadow(0 0 5px rgba(244, 63, 94, 0.35));
+}
 
 /* Sleek Scrollbars */
 html[data-wl-active="1"] ::-webkit-scrollbar {

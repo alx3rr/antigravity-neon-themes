@@ -9,8 +9,9 @@ export function buildBrowserBundle({ config, cssText }) {
     cssText,
     worldlines: Object.values(WORLDLINES).map((w) => ({
       id: w.id,
+      code: w.code || w.divergence,
       name: w.name,
-      divergence: w.divergence,
+      divergence: w.code || w.divergence,
       tagline: w.tagline,
       swatches: w.swatches
     })),
@@ -24,8 +25,10 @@ export function buildBrowserBundle({ config, cssText }) {
   if (typeof window.__wl_cleanup === 'function') {
     try { window.__wl_cleanup(); } catch {}
   }
+  window.__wl_latest_metrics = null;
+  window.__wl_last_cid = '';
 
-  // Remove stale Worldline Settings nodes so updated layout mounts cleanly
+  // Remove stale Settings nodes so updated layout mounts cleanly
   try {
     for (const oldId of ['wl-settings-nav-btn', 'wl-settings-pane']) {
       const el = document.getElementById(oldId);
@@ -67,7 +70,10 @@ export function buildBrowserBundle({ config, cssText }) {
       const el = document.getElementById(id);
       if (el) el.remove();
     }
-    document.querySelectorAll('[data-wl-model]').forEach((el) => el.removeAttribute('data-wl-model'));
+    document.querySelectorAll('[data-wl-model], [data-wl-effort]').forEach((el) => {
+      el.removeAttribute('data-wl-model');
+      el.removeAttribute('data-wl-effort');
+    });
     return;
   }
 
@@ -75,7 +81,7 @@ export function buildBrowserBundle({ config, cssText }) {
   root.setAttribute('data-wl-active', '1');
   root.setAttribute('data-wl-preset', cfg.preset || 'cyberpunk');
 
-  // 1b. Colorize model names + animated fluorescent Gemini 4 Neon
+  // 1b. Colorize model names, animated Gemini 4 Neon & reasoning effort levels
   function classifyModel(rawText) {
     const t = String(rawText || '').trim();
     if (!t) return '';
@@ -86,6 +92,15 @@ export function buildBrowserBundle({ config, cssText }) {
     if (/gemini\\s*\\d*(?:\\.\\d+)?\\s*flash/i.test(t)) return 'flash';
     if (/claude/i.test(t)) return 'claude';
     if (/\\bgpt\\b/i.test(t)) return 'gpt';
+    return '';
+  }
+
+  function classifyEffort(rawText) {
+    const t = String(rawText || '').trim();
+    if (/^(?:extra[\\s_-]*high|x[\\s_-]*high)$/i.test(t)) return 'extra-high';
+    if (/^high$/i.test(t)) return 'high';
+    if (/^medium$/i.test(t)) return 'medium';
+    if (/^low$/i.test(t)) return 'low';
     return '';
   }
 
@@ -102,48 +117,77 @@ export function buildBrowserBundle({ config, cssText }) {
     return fallbackEl;
   }
 
+  function tagEffortLabels(container) {
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      const val = (node.nodeValue || '').trim();
+      const effort = classifyEffort(val);
+      if (effort && node.parentElement && !node.parentElement.hasAttribute('data-wl-model')) {
+        node.parentElement.setAttribute('data-wl-effort', effort);
+      }
+    }
+  }
+
   function tagModelElements() {
     try {
       const triggers = document.querySelectorAll('[data-testid="model-selector-trigger"]');
       for (const trig of triggers) {
         const raw = trig.getAttribute('data-model-label') || trig.textContent || '';
         const kind = classifyModel(raw);
-        trig.querySelectorAll('[data-wl-model]').forEach((el) => el.removeAttribute('data-wl-model'));
+        trig.querySelectorAll('[data-wl-model], [data-wl-effort]').forEach((el) => {
+          el.removeAttribute('data-wl-model');
+          el.removeAttribute('data-wl-effort');
+        });
         if (kind) {
           const targetSpan = findModelLabelSpan(trig, trig);
           targetSpan.setAttribute('data-wl-model', kind);
         }
+        tagEffortLabels(trig);
       }
 
       const menuItems = document.querySelectorAll('[role="menu"] [role="menuitem"], [role="menu"] [role="menuitemradio"], [role="listbox"] [role="option"]');
       for (const item of menuItems) {
         const kind = classifyModel(item.textContent || '');
-        item.querySelectorAll('[data-wl-model]').forEach((el) => el.removeAttribute('data-wl-model'));
+        item.querySelectorAll('[data-wl-model], [data-wl-effort]').forEach((el) => {
+          el.removeAttribute('data-wl-model');
+          el.removeAttribute('data-wl-effort');
+        });
         if (kind) {
           const labelEl = findModelLabelSpan(item, item);
           labelEl.setAttribute('data-wl-model', kind);
         }
+        tagEffortLabels(item);
       }
     } catch {}
   }
 
   if (document.body && typeof MutationObserver !== 'undefined') {
-    const modelObserver = new MutationObserver((muts) => {
+    const uiObserver = new MutationObserver((muts) => {
+      let needModels = false;
+      let needSettings = false;
       for (const m of muts) {
         for (const n of m.addedNodes) {
           if (n.nodeType !== 1) continue;
           if (
-            (n.matches && n.matches('[role="menu"], [role="listbox"]')) ||
+            (n.matches && n.matches('[role="dialog"]')) ||
+            (n.querySelector && n.querySelector('[role="dialog"]'))
+          ) {
+            needSettings = true;
+          }
+          if (
+            (n.matches && n.matches('[role="menu"], [role="listbox"], [role="menuitem"], [role="menuitemradio"]')) ||
             (n.querySelector && n.querySelector('[role="menu"], [role="listbox"], [data-testid="model-selector-trigger"]'))
           ) {
-            tagModelElements();
-            return;
+            needModels = true;
           }
         }
       }
+      if (needSettings) mountSettingsEntry();
+      if (needModels) tagModelElements();
     });
-    modelObserver.observe(document.body, { childList: true, subtree: true });
-    cleanups.push(() => modelObserver.disconnect());
+    uiObserver.observe(document.body, { childList: true, subtree: true });
+    cleanups.push(() => uiObserver.disconnect());
   }
 
   let styleEl = document.getElementById('wl-theme-style');
@@ -344,13 +388,13 @@ export function buildBrowserBundle({ config, cssText }) {
     }
   };
 
-  // 5. Simple Settings -> Worldline Tab (in Spanish)
+  // 5. Simple Settings -> Neon Themes Tab (in Spanish)
   function renderSettingsPaneHtml() {
     const presetCards = boot.worldlines
       .map(
         (w) =>
           '<button type="button" class="wl-preset-card" data-wl-pick-preset="' + w.id + '" data-selected="' + (cfg.preset === w.id ? '1' : '0') + '">' +
-          '<div class="wl-preset-top"><span class="wl-preset-name">' + w.name + '</span><span class="wl-preset-div">' + w.divergence + '</span></div>' +
+          '<div class="wl-preset-top"><span class="wl-preset-name">' + w.name + '</span></div>' +
           '<div class="wl-preset-desc">' + w.tagline + '</div>' +
           '<div class="wl-swatches">' + w.swatches.map((c) => '<span class="wl-swatch" style="background:' + c + '"></span>').join('') + '</div>' +
           '</button>'
@@ -386,9 +430,9 @@ export function buildBrowserBundle({ config, cssText }) {
     const panelOpacity = Number.isFinite(Number(cfg.panelOpacity)) ? Number(cfg.panelOpacity) : 72;
 
     return (
-      '<h2 class="wl-sp-title"><span class="wl-dot"></span><span>Worldline</span> <span class="wl-div-badge">' + activeWl.divergence + '</span></h2>' +
-      '<p class="wl-sp-sub">Cambia la apariencia de Antigravity y el medidor de tokens Gemini al instante.</p>' +
-      '<div class="wl-sp-section">Línea de mundo (Tema)</div>' +
+      '<h2 class="wl-sp-title"><span class="wl-dot"></span><span>Antigravity · Neon Themes</span> <span class="wl-div-badge">' + activeWl.code + '</span></h2>' +
+      '<p class="wl-sp-sub">Personaliza la apariencia de Antigravity y el medidor de tokens Gemini al instante.</p>' +
+      '<div class="wl-sp-section">Future Gadgets</div>' +
       '<div class="wl-preset-grid">' + presetCards + '</div>' +
       '<div class="wl-sp-section">Color de acento</div>' +
       '<div class="wl-accent-row">' + accentBtns + '</div>' +
@@ -461,7 +505,7 @@ export function buildBrowserBundle({ config, cssText }) {
       btn = document.createElement('button');
       btn.id = 'wl-settings-nav-btn';
       btn.type = 'button';
-      btn.innerHTML = '<span>✦</span><span>Worldline</span>';
+      btn.innerHTML = '<span>✦</span><span>Neon Themes</span>';
       navList.appendChild(btn);
 
       const closeWorldlinePane = () => {

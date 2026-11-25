@@ -304,7 +304,7 @@ export function createGeminiMetricsService(conversationsDir) {
     </svg>`;
   }
 
-  function buildPayload(cascadeId, divergence = '0.571024') {
+  function buildPayload(cascadeId, gadgetCode = 'FG-010') {
     const chat = readCurrentChat(cascadeId);
     const weekly = readWeeklySummary();
 
@@ -386,7 +386,7 @@ export function createGeminiMetricsService(conversationsDir) {
           <span class="${dotClass}"></span>
           <span>${escapeHtml(chat.hasData ? chat.modelName : 'Antigravity · Gemini')}</span>
         </span>
-        <span class="wl-div-badge">${escapeHtml(divergence)}</span>
+        <span class="wl-div-badge">${escapeHtml(gadgetCode)}</span>
       </div>
       ${heroHtml}
       <div class="wl-chart-box">

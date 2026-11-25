@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * cli.mjs — Simple installer, uninstaller & launcher for Antigravity Worldline
+ * cli.mjs — Simple installer, uninstaller & launcher for Antigravity · Neon Themes
  */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -93,6 +93,19 @@ function stopDaemon() {
       process.kill(pid, 'SIGTERM');
     } catch {}
   }
+  if (process.platform === 'win32') {
+    try {
+      execFileSync(
+        'powershell.exe',
+        [
+          '-NoProfile',
+          '-Command',
+          "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Where-Object { $_.CommandLine -like '*daemon.mjs*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
+        ],
+        { stdio: 'ignore' }
+      );
+    } catch {}
+  }
   try {
     if (fs.existsSync(getPidPath())) fs.unlinkSync(getPidPath());
   } catch {}
@@ -173,7 +186,7 @@ async function cmdInstall(args) {
   await new Promise((r) => setTimeout(r, 700));
   const { port, targets } = await discoverAntigravityTargets();
 
-  console.log(`\n✦ Antigravity Worldline instalado (${WORLDLINES[next.preset].name} · ${WORLDLINES[next.preset].divergence})`);
+  console.log(`\n✦ Antigravity · Neon Themes instalado (${WORLDLINES[next.preset].name})`);
   console.log(`  Demonio activo (${pid ? `PID ${pid}` : 'en segundo plano'})`);
   if (port && targets.length > 0) {
     console.log(`  Conectado a Antigravity (puerto CDP ${port}) — tema aplicado en caliente.`);
@@ -184,7 +197,7 @@ async function cmdInstall(args) {
 }
 
 async function cmdUninstall() {
-  console.log('Desinstalando Antigravity Worldline...');
+  console.log('Desinstalando Antigravity · Neon Themes...');
   await injectDisabledOnce();
   stopDaemon();
   setupWindowsAutostart(false);
@@ -224,8 +237,8 @@ async function cmdStatus() {
   const pid = readDaemonPid();
   const { port, targets } = await discoverAntigravityTargets();
   const wl = WORLDLINES[cfg.preset] || WORLDLINES[DEFAULT_CONFIG.preset];
-  console.log('\nAntigravity Worldline · Estado');
-  console.log(`  Línea de mundo : ${wl.name} (${wl.divergence})`);
+  console.log('\nAntigravity · Neon Themes · Estado');
+  console.log(`  Future Gadget  : ${wl.name}`);
   console.log(`  Demonio        : ${pid ? `Activo (PID ${pid})` : 'Detenido'}`);
   console.log(`  Puerto CDP     : ${port ? `${port} (${targets.length} ventana/s)` : 'No detectado (usa node cli.mjs relaunch)'}`);
   console.log(`  Métricas Gemini: ${cfg.showMetrics ? 'Activadas' : 'Desactivadas'}`);
@@ -243,8 +256,8 @@ if (cmd === 'install') {
   await cmdStatus();
 } else {
   console.log(`
-Antigravity Worldline · Comandos:
-  node cli.mjs install [--preset border-translucent|border-sunset|cyberpunk]
+Antigravity · Neon Themes · Comandos:
+  node cli.mjs install [--preset border-translucent|cyberpunk|border-sunset]
   node cli.mjs relaunch
   node cli.mjs status
   node cli.mjs uninstall

@@ -1,5 +1,5 @@
 /**
- * src/daemon.mjs — Lightweight zero-dependency CDP daemon for Antigravity Worldline
+ * src/daemon.mjs — Lightweight zero-dependency CDP daemon for Antigravity · Neon Themes
  */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -232,7 +232,7 @@ async function runDaemon() {
         if (res?.result?.value) sess.cascadeId = String(res.result.value);
       }
       const wl = WORLDLINES[config.preset] || WORLDLINES[DEFAULT_CONFIG.preset];
-      const payload = metricsService.buildPayload(sess.cascadeId, wl.divergence);
+      const payload = metricsService.buildPayload(sess.cascadeId, wl.code || wl.divergence);
       const sig = JSON.stringify(payload);
       if (sig === sess.lastMetricsSig) return;
       sess.lastMetricsSig = sig;
