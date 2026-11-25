@@ -569,6 +569,12 @@ html[data-wl-active="1"] [id="antigravity.agentSidePanelInputBox"] button[data-t
   box-shadow: 0 0 18px rgba(244, 63, 94, 0.48) !important;
 }
 
+/* Restore contrast for inverted-surface controls (e.g. Voice Mode pill uses bg-foreground + text-background) */
+html[data-wl-active="1"] .text-background,
+html[data-wl-active="1"] [data-testid="voice-live-pill"] {
+  color: var(--wl-bg, #111328) !important;
+}
+
 /* Color-coded Permissions Pill & Menu Options (Turbo / Auto / Default / Strict) */
 html[data-wl-active="1"] [data-testid="permissions-selector-trigger"][data-wl-perm] {
   border-radius: 9999px !important;

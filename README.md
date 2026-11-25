@@ -25,9 +25,10 @@ Pasa el ratón (o haz clic para fijarlo) sobre la barra inferior del chat para v
 * Selector rápido de **Future Gadgets** con 1 clic.
 * Selector de **color de acento** (o automático del tema).
 * Controles de **desenfoque (Blur)** y **opacidad del panel** en tiempo real.
-* Colores diferenciados en el selector de modelos y niveles de esfuerzo (con efecto neón animado en **Gemini 4 Neon**).
+* Colores diferenciados en el selector de modelos y niveles de esfuerzo (con efecto neón animado en **Gemini 4 Neon** y botón **View Usage** destacado).
+* Logotipo vectorial arcoíris de Antigravity, pill de permisos por color (`Turbo`, `Auto`, `Default`, `Strict`) y botones neón de envío/parada.
 * **Tipografía limpia** (estilo Inter + JetBrains Mono).
-* Activar/desactivar la barra de tokens Gemini.
+* Activar/desactivar la barra de tokens Gemini (conservando la pestaña activa al cambiar opciones).
 
 ---
 
