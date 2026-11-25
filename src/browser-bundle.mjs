@@ -62,7 +62,6 @@ export function buildBrowserBundle({ config, cssText }) {
   if (!cfg.enabled) {
     root.removeAttribute('data-wl-active');
     root.removeAttribute('data-wl-preset');
-    root.removeAttribute('data-wl-zen');
     root.removeAttribute('data-wl-running');
     for (const id of ['wl-theme-style', 'wl-metrics-pill', 'wl-metrics-popover', 'wl-settings-nav-btn', 'wl-settings-pane']) {
       const el = document.getElementById(id);
@@ -73,8 +72,7 @@ export function buildBrowserBundle({ config, cssText }) {
 
   // 1. Mount CSS & theme attributes
   root.setAttribute('data-wl-active', '1');
-  root.setAttribute('data-wl-preset', cfg.preset || 'tokyo-night');
-  root.setAttribute('data-wl-zen', cfg.zenMode ? '1' : '0');
+  root.setAttribute('data-wl-preset', cfg.preset || 'cyberpunk');
 
   let styleEl = document.getElementById('wl-theme-style');
   if (!styleEl) {
@@ -92,14 +90,9 @@ export function buildBrowserBundle({ config, cssText }) {
     }
   }
 
-  // 2. Zen Mode shortcut (Ctrl + Shift + Z)
+  // 2. Escape closes metrics popover
   const onKeyDown = (e) => {
-    if (e.ctrlKey && e.shiftKey && String(e.key || '').toLowerCase() === 'z') {
-      e.preventDefault();
-      const nextZen = root.getAttribute('data-wl-zen') !== '1';
-      root.setAttribute('data-wl-zen', nextZen ? '1' : '0');
-      sendConfigPatch({ zenMode: nextZen });
-    } else if (e.key === 'Escape') {
+    if (e.key === 'Escape') {
       closePopover();
     }
   };
@@ -296,7 +289,7 @@ export function buildBrowserBundle({ config, cssText }) {
       .map(
         (a) =>
           '<button type="button" class="wl-accent-btn" data-wl-pick-accent="' + a.id + '" data-selected="' + (cfg.accent === a.id ? '1' : '0') + '">' +
-          (a.color ? '<span class="wl-accent-dot" style="background:' + a.color + '"></span>' : '') +
+          '<span class="wl-accent-dot" style="background:' + (a.color || 'var(--wl-accent)') + '"></span>' +
           '<span>' + a.label + '</span></button>'
       )
       .join('');
@@ -310,7 +303,7 @@ export function buildBrowserBundle({ config, cssText }) {
     const activeWl = boot.worldlines.find((w) => w.id === cfg.preset) || boot.worldlines[0];
 
     return (
-      '<h2 class="wl-sp-title">Worldline <span class="wl-div-badge">' + activeWl.divergence + '</span></h2>' +
+      '<h2 class="wl-sp-title"><span class="wl-dot"></span><span>Worldline</span> <span class="wl-div-badge">' + activeWl.divergence + '</span></h2>' +
       '<p class="wl-sp-sub">Cambia la apariencia de Antigravity y el medidor de tokens Gemini al instante.</p>' +
       '<div class="wl-sp-section">Línea de mundo (Tema)</div>' +
       '<div class="wl-preset-grid">' + presetCards + '</div>' +
@@ -320,7 +313,6 @@ export function buildBrowserBundle({ config, cssText }) {
       '<div class="wl-toggle-list">' +
       toggleRow('showMetrics', 'Barra de tokens Gemini', 'Muestra memoria libre del chat y gráfica semanal de los modelos Gemini.', cfg.showMetrics) +
       toggleRow('cleanFont', 'Tipografía limpia', 'Usa Inter / JetBrains Mono para texto y bloques de código.', cfg.cleanFont) +
-      toggleRow('zenMode', 'Modo Zen (Ctrl+Shift+Z)', 'Oculta la barra lateral izquierda para centrarte solo en el chat.', cfg.zenMode) +
       '</div>'
     );
   }

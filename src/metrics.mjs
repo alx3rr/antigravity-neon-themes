@@ -280,7 +280,7 @@ export function createGeminiMetricsService(conversationsDir) {
     </svg>`;
   }
 
-  function buildPayload(cascadeId, divergence = '1.048596') {
+  function buildPayload(cascadeId, divergence = '0.571024') {
     const chat = readCurrentChat(cascadeId);
     const weekly = readWeeklySummary();
 
@@ -377,7 +377,7 @@ export function createGeminiMetricsService(conversationsDir) {
       </div>
       <div class="wl-card-footer">
         <span>Solo modelos Gemini</span>
-        <span>Clic para fijar · Ctrl+Shift+Z Zen</span>
+        <span>Clic para fijar</span>
       </div>
     </div>`;
 

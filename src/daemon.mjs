@@ -230,7 +230,7 @@ async function runDaemon() {
         const res = await sess.evalJs('typeof window.__wl_get_cid === "function" ? window.__wl_get_cid() : ""');
         if (res?.result?.value) sess.cascadeId = String(res.result.value);
       }
-      const wl = WORLDLINES[config.preset] || WORLDLINES['tokyo-night'];
+      const wl = WORLDLINES[config.preset] || WORLDLINES[DEFAULT_CONFIG.preset];
       const payload = metricsService.buildPayload(sess.cascadeId, wl.divergence);
       const sig = JSON.stringify(payload);
       if (sig === sess.lastMetricsSig) return;

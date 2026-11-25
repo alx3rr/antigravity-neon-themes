@@ -1,6 +1,6 @@
-# Antigravity Worldline `1.048596`
+# Antigravity Worldline `0.571024`
 
-> Cambia de *línea de mundo* en **Google Antigravity** — 4 temas curados (**Tokyo Night**, **Cyberpunk**, **Border Sunset** y **Border Translucent**) + monitor de tokens y actividad semanal **solo para modelos Gemini**.
+> Cambia de *línea de mundo* en **Google Antigravity** — 3 temas curados (**Border Translucent**, **Border Sunset** y **Cyberpunk Borderless**) + monitor de tokens y actividad semanal **solo para modelos Gemini**.
 
 Sin dependencias externas (`npm install` no es necesario), 100 % en español, ligero y sin modificar los binarios de Antigravity.
 
@@ -8,13 +8,12 @@ Sin dependencias externas (`npm install` no es necesario), 100 % en español, li
 
 ## Qué incluye
 
-### 4 líneas de mundo (temas)
+### 3 líneas de mundo (temas)
 | Tema | Inspiración | Estética |
 | :--- | :--- | :--- |
-| **Tokyo Night** | Tokyo Night (VS Code) | Azul noche limpio, bordes finos y contraste cómodo para horas de uso. |
-| **Cyberpunk** | SynthWave '84 | Fondo oscuro violáceo con acentos cian/magenta y brillo neón en la caja activa. |
-| **Border Sunset** | Obsidian Border (*Sunset*) | Tarjetas nítidas con paleta oscura cálida y tonos atardecer ámbar/coral. |
-| **Border Translucent** | Obsidian Border (*Translucent*) | Paneles estilo cristal esmerilado (`backdrop-filter: blur`) sobre fondo degradado profundo. |
+| **Border Translucent** | Obsidian Border (*Translucent*) | Resplandor azul real a violeta en la barra lateral y tarjeta principal translúcida esmerilada. |
+| **Border Sunset** | Obsidian Border (*Sunset*) | Lienzo espresso-ciruela oscuro con brillo cálido dorado y terracota desde la parte inferior. |
+| **Cyberpunk Borderless** | SynthWave '84 | Lienzo índigo-violeta unificado sin bordes con acento neón magenta y cian. |
 
 ### Medidor de Divergencia (solo modelos Gemini)
 Pasa el ratón (o haz clic para fijarlo) sobre la barra inferior del chat para ver:
@@ -26,7 +25,6 @@ Pasa el ratón (o haz clic para fijarlo) sobre la barra inferior del chat para v
 * Cambio de tema en vivo con 1 clic.
 * Selector de **color de acento** (o automático del tema).
 * **Tipografía limpia** (estilo Inter + JetBrains Mono).
-* **Modo Zen** (`Ctrl + Shift + Z`) para ocultar la barra lateral.
 * Activar/desactivar la barra de tokens Gemini.
 
 ---

@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, spawn } from 'node:child_process';
-import { WORLDLINES } from './src/themes.mjs';
+import { WORLDLINES, DEFAULT_CONFIG } from './src/themes.mjs';
 import {
   getDataDir,
   getPidPath,
@@ -223,7 +223,7 @@ async function cmdStatus() {
   const cfg = loadConfig();
   const pid = readDaemonPid();
   const { port, targets } = await discoverAntigravityTargets();
-  const wl = WORLDLINES[cfg.preset] || WORLDLINES['tokyo-night'];
+  const wl = WORLDLINES[cfg.preset] || WORLDLINES[DEFAULT_CONFIG.preset];
   console.log('\nAntigravity Worldline · Estado');
   console.log(`  Línea de mundo : ${wl.name} (${wl.divergence})`);
   console.log(`  Demonio        : ${pid ? `Activo (PID ${pid})` : 'Detenido'}`);
@@ -244,7 +244,7 @@ if (cmd === 'install') {
 } else {
   console.log(`
 Antigravity Worldline · Comandos:
-  node cli.mjs install [--preset tokyo-night|cyberpunk|border-sunset|border-translucent]
+  node cli.mjs install [--preset border-translucent|border-sunset|cyberpunk]
   node cli.mjs relaunch
   node cli.mjs status
   node cli.mjs uninstall
