@@ -28,6 +28,23 @@ export function buildBrowserBundle({ config, cssText }) {
   window.__wl_latest_metrics = null;
   window.__wl_last_cid = '';
 
+  // Preserve active Settings tab & scroll across hot-reloads
+  let restoreSettingsOpen = false;
+  let prevPaneScroll = 0;
+  let prevRightScroll = 0;
+  try {
+    const prevBtn = document.getElementById('wl-settings-nav-btn');
+    const prevPane = document.getElementById('wl-settings-pane');
+    restoreSettingsOpen = Boolean(
+      (prevBtn && prevBtn.getAttribute('data-active') === '1') ||
+      (prevPane && prevPane.style.display !== 'none')
+    );
+    if (prevPane) {
+      prevPaneScroll = prevPane.scrollTop || 0;
+      prevRightScroll = prevPane.parentElement ? (prevPane.parentElement.scrollTop || 0) : 0;
+    }
+  } catch {}
+
   // Remove stale Settings & Metrics nodes so updated layout and listeners mount cleanly
   try {
     for (const oldId of ['wl-settings-nav-btn', 'wl-settings-pane', 'wl-metrics-pill', 'wl-metrics-popover']) {
@@ -586,7 +603,10 @@ export function buildBrowserBundle({ config, cssText }) {
 
   function mountSettingsEntry() {
     const dialog = document.querySelector('[role="dialog"]');
-    if (!dialog) return;
+    if (!dialog) {
+      restoreSettingsOpen = false;
+      return;
+    }
 
     const navButtons = Array.from(dialog.querySelectorAll('button, a'));
     const appearanceBtn = navButtons.find((b) => /^Appearance$/i.test((b.textContent || '').trim()));
@@ -694,12 +714,22 @@ export function buildBrowserBundle({ config, cssText }) {
 
       if (!leftCol.getAttribute('data-wl-nav-bound')) {
         leftCol.setAttribute('data-wl-nav-bound', '1');
-        leftCol.addEventListener('click', (e) => {
+        const onLeftNavClick = (e) => {
           if (e.target && e.target.closest && e.target.closest('#wl-settings-nav-btn')) return;
           if (e.target && e.target.closest && e.target.closest('button, a')) {
             closeWorldlinePane();
           }
-        });
+        };
+        leftCol.addEventListener('click', onLeftNavClick);
+        cleanups.push(() => leftCol.removeEventListener('click', onLeftNavClick));
+      }
+
+      if (restoreSettingsOpen) {
+        restoreSettingsOpen = false;
+        openWorldlinePane();
+        const pane = document.getElementById('wl-settings-pane');
+        if (pane && prevPaneScroll) pane.scrollTop = prevPaneScroll;
+        if (prevRightScroll) rightCol.scrollTop = prevRightScroll;
       }
     }
   }
