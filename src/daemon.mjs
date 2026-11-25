@@ -87,7 +87,8 @@ export async function discoverAntigravityTargets() {
           t.type === 'page' &&
           t.webSocketDebuggerUrl &&
           !String(t.url || '').startsWith('devtools://') &&
-          !String(t.url || '').startsWith('chrome-extension://')
+          !String(t.url || '').startsWith('chrome-extension://') &&
+          !String(t.url || '').startsWith('data:')
       );
       if (pages.length > 0) {
         return { port, targets: pages };

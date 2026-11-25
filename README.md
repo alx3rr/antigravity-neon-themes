@@ -24,6 +24,8 @@ Pasa el ratón (o haz clic para fijarlo) sobre la barra inferior del chat para v
 ### Ajustes simples en `Settings → Worldline`
 * Cambio de tema en vivo con 1 clic.
 * Selector de **color de acento** (o automático del tema).
+* Controles de **desenfoque (Blur)** y **opacidad del panel** en tiempo real.
+* Colores diferenciados en el selector de modelos (con efecto neón animado en **Gemini 4 Neon**).
 * **Tipografía limpia** (estilo Inter + JetBrains Mono).
 * Activar/desactivar la barra de tokens Gemini.
 

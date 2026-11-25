@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { parseGenMetadataRow, isGeminiModel } from './protobuf.mjs';
+import { parseGenMetadataRow, isGeminiModel, extractStepTimestampMs } from './protobuf.mjs';
 
 const require = createRequire(import.meta.url);
 let _DatabaseSync = null;
@@ -94,10 +94,34 @@ export function createGeminiMetricsService(conversationsDir) {
         }
         if (!st || st.mtimeMs < cutoffMs) continue;
 
-        const bucketIdx = dayIndex.get(getLocalDayKey(st.mtimeMs));
+        const fallbackBucketIdx = dayIndex.get(getLocalDayKey(st.mtimeMs));
         let db;
         try {
           db = new DatabaseSync(dbPath, { readOnly: true, timeout: 120 });
+          const stepRows = db.prepare('SELECT idx, metadata FROM steps ORDER BY idx ASC').all();
+          const stepTsByIdx = new Map();
+          const stepIdxs = [];
+          for (const sr of stepRows) {
+            const ts = extractStepTimestampMs(sr.metadata);
+            if (ts > 0) {
+              stepTsByIdx.set(sr.idx, ts);
+              stepIdxs.push(sr.idx);
+            }
+          }
+          const resolveBucketIdx = (maxStepIdx) => {
+            if (maxStepIdx >= 0) {
+              if (stepTsByIdx.has(maxStepIdx)) {
+                return dayIndex.get(getLocalDayKey(stepTsByIdx.get(maxStepIdx)));
+              }
+              for (let j = stepIdxs.length - 1; j >= 0; j--) {
+                if (stepIdxs[j] <= maxStepIdx) {
+                  return dayIndex.get(getLocalDayKey(stepTsByIdx.get(stepIdxs[j])));
+                }
+              }
+            }
+            return fallbackBucketIdx;
+          };
+
           const rows = db.prepare('SELECT idx, data FROM gen_metadata ORDER BY idx ASC').all();
           for (const row of rows) {
             const p = parseGenMetadataRow(row);
@@ -105,12 +129,12 @@ export function createGeminiMetricsService(conversationsDir) {
             const billed = p.inTok + p.outTok;
             if (billed <= 0 && p.ctx <= 0) continue;
             const tokCount = billed > 0 ? billed : p.outTok;
+            const bucketIdx = resolveBucketIdx(p.maxStepIdx);
+            if (bucketIdx === undefined) continue;
             totalTokens += tokCount;
             totalGenerations++;
             byModel.set(p.modelName, (byModel.get(p.modelName) || 0) + tokCount);
-            if (bucketIdx !== undefined) {
-              days[bucketIdx].tokens += tokCount;
-            }
+            days[bucketIdx].tokens += tokCount;
           }
         } catch {
           // Skip locked or unreadable DB files safely
