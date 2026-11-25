@@ -65,14 +65,23 @@ export function buildBrowserBundle({ config, cssText }) {
   if (!cfg.enabled) {
     root.removeAttribute('data-wl-active');
     root.removeAttribute('data-wl-preset');
+    root.removeAttribute('data-wl-animated-bg');
     root.removeAttribute('data-wl-running');
     for (const id of ['wl-theme-style', 'wl-metrics-pill', 'wl-metrics-popover', 'wl-settings-nav-btn', 'wl-settings-pane']) {
       const el = document.getElementById(id);
       if (el) el.remove();
     }
-    document.querySelectorAll('[data-wl-model], [data-wl-effort]').forEach((el) => {
+    document.querySelectorAll('[data-wl-model], [data-wl-effort], [data-wl-perm], [data-wl-view-usage], [data-wl-view-usage-label]').forEach((el) => {
       el.removeAttribute('data-wl-model');
       el.removeAttribute('data-wl-effort');
+      el.removeAttribute('data-wl-perm');
+      el.removeAttribute('data-wl-view-usage');
+      el.removeAttribute('data-wl-view-usage-label');
+    });
+    document.querySelectorAll('svg[data-wl-logo-enhanced="1"]').forEach((svg) => {
+      if (svg.dataset.wlOrigSvg) svg.innerHTML = svg.dataset.wlOrigSvg;
+      svg.removeAttribute('data-wl-logo-enhanced');
+      delete svg.dataset.wlOrigSvg;
     });
     return;
   }
@@ -80,8 +89,53 @@ export function buildBrowserBundle({ config, cssText }) {
   // 1. Mount CSS & theme attributes
   root.setAttribute('data-wl-active', '1');
   root.setAttribute('data-wl-preset', cfg.preset || 'cyberpunk');
+  root.setAttribute('data-wl-animated-bg', cfg.animatedBg ? '1' : '0');
 
-  // 1b. Colorize model names, animated Gemini 4 Neon & reasoning effort levels
+  // 1a. Enhance top-left Antigravity vector logo with authentic rainbow gradient
+  function enhanceAntigravityLogo() {
+    try {
+      const svgs = document.querySelectorAll('button[data-testid="app-icon-new-conversation-button"] svg');
+      for (const svg of svgs) {
+        if (svg.getAttribute('data-wl-logo-enhanced') === '1') continue;
+        const paths = Array.from(svg.querySelectorAll('path'))
+          .map((p) => p.getAttribute('d') || '')
+          .filter(Boolean);
+        if (paths.length === 0) continue;
+        if (!svg.dataset.wlOrigSvg) svg.dataset.wlOrigSvg = svg.innerHTML;
+        const clipPaths = paths.map((d) => '<path d="' + d.replace(/"/g, '&quot;') + '"/>').join('');
+        svg.innerHTML =
+          '<defs>' +
+          '<clipPath id="wl-agy-logo-clip">' + clipPaths + '</clipPath>' +
+          '<radialGradient id="wl-agy-g-green" cx="50%" cy="50%" r="50%">' +
+          '<stop offset="0%" stop-color="#38d977" stop-opacity="0.95"/>' +
+          '<stop offset="68%" stop-color="#38d977" stop-opacity="0"/>' +
+          '</radialGradient>' +
+          '<radialGradient id="wl-agy-g-gold" cx="50%" cy="50%" r="50%">' +
+          '<stop offset="0%" stop-color="#facc15" stop-opacity="0.98"/>' +
+          '<stop offset="68%" stop-color="#facc15" stop-opacity="0"/>' +
+          '</radialGradient>' +
+          '<radialGradient id="wl-agy-g-coral" cx="50%" cy="50%" r="50%">' +
+          '<stop offset="0%" stop-color="#ff5a4e" stop-opacity="0.96"/>' +
+          '<stop offset="70%" stop-color="#ff5a4e" stop-opacity="0"/>' +
+          '</radialGradient>' +
+          '<radialGradient id="wl-agy-g-sky" cx="50%" cy="50%" r="50%">' +
+          '<stop offset="0%" stop-color="#2f88ff" stop-opacity="0.95"/>' +
+          '<stop offset="75%" stop-color="#2f88ff" stop-opacity="0"/>' +
+          '</radialGradient>' +
+          '</defs>' +
+          '<g clip-path="url(#wl-agy-logo-clip)">' +
+          '<rect width="180" height="180" fill="#2575fc"/>' +
+          '<circle cx="52" cy="78" r="68" fill="url(#wl-agy-g-green)"/>' +
+          '<circle cx="88" cy="34" r="54" fill="url(#wl-agy-g-gold)"/>' +
+          '<circle cx="122" cy="60" r="56" fill="url(#wl-agy-g-coral)"/>' +
+          '<circle cx="92" cy="118" r="78" fill="url(#wl-agy-g-sky)"/>' +
+          '</g>';
+        svg.setAttribute('data-wl-logo-enhanced', '1');
+      }
+    } catch {}
+  }
+
+  // 1b. Colorize model names, reasoning effort, Permissions pill & View Usage
   function classifyModel(rawText) {
     const t = String(rawText || '').trim();
     if (!t) return '';
@@ -101,6 +155,15 @@ export function buildBrowserBundle({ config, cssText }) {
     if (/^high$/i.test(t)) return 'high';
     if (/^medium$/i.test(t)) return 'medium';
     if (/^low$/i.test(t)) return 'low';
+    return '';
+  }
+
+  function classifyPermission(rawText) {
+    const t = String(rawText || '').trim();
+    if (/\\bturbo\\b/i.test(t)) return 'turbo';
+    if (/\\bauto\\b/i.test(t)) return 'auto';
+    if (/\\bstrict\\b/i.test(t)) return 'strict';
+    if (/\\bdefault\\b/i.test(t)) return 'default';
     return '';
   }
 
@@ -146,16 +209,44 @@ export function buildBrowserBundle({ config, cssText }) {
         tagEffortLabels(trig);
       }
 
+      const permTrigs = document.querySelectorAll('[data-testid="permissions-selector-trigger"]');
+      for (const pt of permTrigs) {
+        const pKind = classifyPermission(pt.textContent || '');
+        if (pKind) pt.setAttribute('data-wl-perm', pKind);
+        else pt.removeAttribute('data-wl-perm');
+      }
+
       const menuItems = document.querySelectorAll('[role="menu"] [role="menuitem"], [role="menu"] [role="menuitemradio"], [role="listbox"] [role="option"]');
       for (const item of menuItems) {
-        const kind = classifyModel(item.textContent || '');
-        item.querySelectorAll('[data-wl-model], [data-wl-effort]').forEach((el) => {
+        const txt = (item.textContent || '').trim();
+        item.querySelectorAll('[data-wl-model], [data-wl-effort], [data-wl-view-usage-label]').forEach((el) => {
           el.removeAttribute('data-wl-model');
           el.removeAttribute('data-wl-effort');
+          el.removeAttribute('data-wl-view-usage-label');
         });
+        item.removeAttribute('data-wl-view-usage');
+        item.removeAttribute('data-wl-perm');
+
+        if (/view\\s*usage/i.test(txt)) {
+          item.setAttribute('data-wl-view-usage', '1');
+          const walker = document.createTreeWalker(item, NodeFilter.SHOW_TEXT);
+          while (walker.nextNode()) {
+            const val = (walker.currentNode.nodeValue || '').trim();
+            if (/view\\s*usage/i.test(val) && walker.currentNode.parentElement) {
+              walker.currentNode.parentElement.setAttribute('data-wl-view-usage-label', '1');
+              break;
+            }
+          }
+          continue;
+        }
+
+        const kind = classifyModel(txt);
         if (kind) {
           const labelEl = findModelLabelSpan(item, item);
           labelEl.setAttribute('data-wl-model', kind);
+        } else {
+          const pKind = classifyPermission(txt);
+          if (pKind) item.setAttribute('data-wl-perm', pKind);
         }
         tagEffortLabels(item);
       }
@@ -166,6 +257,7 @@ export function buildBrowserBundle({ config, cssText }) {
     const uiObserver = new MutationObserver((muts) => {
       let needModels = false;
       let needSettings = false;
+      let needLogo = false;
       for (const m of muts) {
         for (const n of m.addedNodes) {
           if (n.nodeType !== 1) continue;
@@ -177,12 +269,19 @@ export function buildBrowserBundle({ config, cssText }) {
           }
           if (
             (n.matches && n.matches('[role="menu"], [role="listbox"], [role="menuitem"], [role="menuitemradio"]')) ||
-            (n.querySelector && n.querySelector('[role="menu"], [role="listbox"], [data-testid="model-selector-trigger"]'))
+            (n.querySelector && n.querySelector('[role="menu"], [role="listbox"], [data-testid="model-selector-trigger"], [data-testid="permissions-selector-trigger"]'))
           ) {
             needModels = true;
           }
+          if (
+            (n.matches && n.matches('[data-testid="app-icon-new-conversation-button"]')) ||
+            (n.querySelector && n.querySelector('[data-testid="app-icon-new-conversation-button"]'))
+          ) {
+            needLogo = true;
+          }
         }
       }
+      if (needLogo) enhanceAntigravityLogo();
       if (needSettings) mountSettingsEntry();
       if (needModels) tagModelElements();
     });
@@ -233,7 +332,17 @@ export function buildBrowserBundle({ config, cssText }) {
   // 4. Gemini Telemetry Pill + Hover / Click Popover
   let pinned = false;
   let hideTimer = null;
+  let openModelKey = '';
   let latestMetrics = window.__wl_latest_metrics || null;
+
+  function applyOpenModelState(pop) {
+    if (!pop || !openModelKey) return;
+    pop.querySelectorAll('.wl-model-item').forEach((el) => {
+      if (el.getAttribute('data-wl-model-key') === openModelKey) {
+        el.setAttribute('data-open', '1');
+      }
+    });
+  }
 
   function ensurePopover() {
     let pop = document.getElementById('wl-metrics-popover');
@@ -246,6 +355,24 @@ export function buildBrowserBundle({ config, cssText }) {
       });
       pop.addEventListener('mouseleave', () => {
         if (!pinned) scheduleHidePopover();
+      });
+      pop.addEventListener('click', (e) => {
+        const modelBtn = e.target && e.target.closest ? e.target.closest('.wl-model-item') : null;
+        if (!modelBtn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        pinned = true;
+        const key = modelBtn.getAttribute('data-wl-model-key') || '';
+        const wasOpen = modelBtn.getAttribute('data-open') === '1';
+        pop.querySelectorAll('.wl-model-item[data-open="1"]').forEach((el) => el.removeAttribute('data-open'));
+        if (wasOpen) {
+          openModelKey = '';
+        } else {
+          openModelKey = key;
+          modelBtn.setAttribute('data-open', '1');
+        }
+        const pill = document.getElementById('wl-metrics-pill');
+        if (pill) positionPopover(pill, pop);
       });
     }
     return pop;
@@ -270,6 +397,7 @@ export function buildBrowserBundle({ config, cssText }) {
     if (!pop) return;
     if (latestMetrics && latestMetrics.popoverHtml) {
       pop.innerHTML = latestMetrics.popoverHtml;
+      applyOpenModelState(pop);
     }
     positionPopover(pill, pop);
     pop.setAttribute('data-visible', '1');
@@ -384,6 +512,7 @@ export function buildBrowserBundle({ config, cssText }) {
     const pop = document.getElementById('wl-metrics-popover');
     if (pop && pop.getAttribute('data-visible') === '1' && payload.popoverHtml) {
       pop.innerHTML = payload.popoverHtml;
+      applyOpenModelState(pop);
       if (pill) positionPopover(pill, pop);
     }
   };
@@ -440,6 +569,7 @@ export function buildBrowserBundle({ config, cssText }) {
       '<div class="wl-toggle-list">' +
       sliderRow('blurPx', 'Desenfoque (Blur)', 'Intensidad del efecto cristal esmerilado en paneles y barra lateral.', blurPx, 0, 32, 'px') +
       sliderRow('panelOpacity', 'Opacidad del panel', 'Baja el porcentaje para dejar ver más el degradado de fondo.', panelOpacity, 40, 95, '%') +
+      toggleRow('animatedBg', 'Fondo animado suave', 'Movimiento lento del degradado de fondo (desactívalo para consumo cero).', cfg.animatedBg) +
       '</div>' +
       '<div class="wl-sp-section">Opciones</div>' +
       '<div class="wl-toggle-list">' +
@@ -554,6 +684,9 @@ export function buildBrowserBundle({ config, cssText }) {
             if (toggleBtn) {
               const key = toggleBtn.getAttribute('data-wl-toggle');
               cfg[key] = !cfg[key];
+              if (key === 'animatedBg') {
+                root.setAttribute('data-wl-animated-bg', cfg[key] ? '1' : '0');
+              }
               sendConfigPatch({ [key]: cfg[key] });
               pane.innerHTML = renderSettingsPaneHtml();
             }
@@ -606,6 +739,7 @@ export function buildBrowserBundle({ config, cssText }) {
 
   // 6. Lightweight periodic sync for SPA navigation & Settings modal
   const tick = () => {
+    enhanceAntigravityLogo();
     tagModelElements();
     mountMetricsPill();
     mountSettingsEntry();

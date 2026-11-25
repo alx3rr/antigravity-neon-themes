@@ -133,7 +133,17 @@ export function createGeminiMetricsService(conversationsDir) {
             if (bucketIdx === undefined) continue;
             totalTokens += tokCount;
             totalGenerations++;
-            byModel.set(p.modelName, (byModel.get(p.modelName) || 0) + tokCount);
+            const cur = byModel.get(p.modelName) || { tokens: 0, calls: 0, tpsSum: 0, tpsCount: 0 };
+            cur.tokens += tokCount;
+            cur.calls++;
+            const sTps = p.stream >= 0.12 ? p.outTok / p.stream : 0;
+            const eTps = p.totDur > 0 ? p.outTok / p.totDur : 0;
+            const rowTps = sTps > 0 && sTps <= 3000 ? sTps : eTps;
+            if (rowTps > 0) {
+              cur.tpsSum += rowTps;
+              cur.tpsCount++;
+            }
+            byModel.set(p.modelName, cur);
             days[bucketIdx].tokens += tokCount;
           }
         } catch {
@@ -147,9 +157,15 @@ export function createGeminiMetricsService(conversationsDir) {
     }
 
     const topModels = Array.from(byModel.entries())
-      .sort((a, b) => b[1] - a[1])
+      .sort((a, b) => b[1].tokens - a[1].tokens)
       .slice(0, 4)
-      .map(([model, tokens]) => ({ model, tokens }));
+      .map(([model, stats]) => ({
+        model,
+        tokens: stats.tokens,
+        calls: stats.calls,
+        avgTps: stats.tpsCount > 0 ? Math.round(stats.tpsSum / stats.tpsCount) : 0,
+        sharePct: totalTokens > 0 ? Math.round((stats.tokens / totalTokens) * 100) : 0
+      }));
 
     const activeDays = days.filter((d) => d.tokens > 0).length || 1;
     const avgPerDay = Math.round(totalTokens / activeDays);
@@ -342,7 +358,10 @@ export function createGeminiMetricsService(conversationsDir) {
         ? `<div class="wl-models-list">${weekly.topModels
             .map(
               (m) =>
-                `<div class="wl-model-row"><span>${escapeHtml(m.model)}</span><strong>${fmtTok(m.tokens)} tok</strong></div>`
+                `<button type="button" class="wl-model-item" data-wl-model-key="${escapeHtml(m.model)}">` +
+                `<div class="wl-model-row"><span>${escapeHtml(m.model)} ▾</span><strong>${fmtTok(m.tokens)} tok</strong></div>` +
+                `<div class="wl-model-detail">${m.calls} llamadas · Media ${m.avgTps} tok/s · ${m.sharePct}% semanal</div>` +
+                `</button>`
             )
             .join('')}</div>`
         : '';
