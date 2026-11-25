@@ -274,12 +274,20 @@ html[data-wl-active="1"][data-wl-running="1"] [id="antigravity.agentSidePanelInp
   animation: wl-border-pulse 2.2s ease-in-out infinite !important;
 }
 
-/* User Message Bubbles & Code Blocks */
-html[data-wl-active="1"] .agy-user-bubble,
-html[data-wl-active="1"] [data-testid="user-message-content"] {
+/* User Message Bubbles — clean single surface, no inner text outline */
+html[data-wl-active="1"] .agy-user-bubble {
   background: var(--wl-surface-2) !important;
-  border: 1px solid var(--wl-border) !important;
+  border: 1px solid transparent !important;
   border-radius: var(--wl-radius) !important;
+  box-shadow: none !important;
+}
+
+html[data-wl-active="1"] [data-testid="user-message-content"],
+html[data-wl-active="1"] .agy-user-bubble [data-testid="user-message-content"] {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 html[data-wl-active="1"] pre {

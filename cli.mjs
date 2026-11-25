@@ -25,7 +25,9 @@ function getWindowsShortcuts() {
   const appData = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
   return [
     path.join(appData, 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Antigravity.lnk'),
-    path.join(appData, 'Microsoft', 'Internet Explorer', 'Quick Launch', 'User Pinned', 'TaskBar', 'Antigravity.lnk')
+    path.join(appData, 'Microsoft', 'Internet Explorer', 'Quick Launch', 'User Pinned', 'TaskBar', 'Antigravity.lnk'),
+    path.join(os.homedir(), 'Desktop', 'Antigravity.lnk'),
+    path.join('C:\\Users\\Public\\Desktop', 'Antigravity.lnk')
   ].filter((p) => fs.existsSync(p));
 }
 
@@ -98,6 +100,25 @@ function stopDaemon() {
 
 function startDaemon() {
   stopDaemon();
+  if (process.platform === 'win32') {
+    const vbsPath = path.join(getDataDir(), 'AntigravityWorldline.vbs');
+    if (fs.existsSync(vbsPath)) {
+      const cmdLine = `wscript.exe "${vbsPath}"`.replace(/'/g, "''");
+      try {
+        // Spawn via WMI so the background daemon survives parent terminal / Antigravity restarts
+        execFileSync(
+          'powershell.exe',
+          [
+            '-NoProfile',
+            '-Command',
+            `Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = '${cmdLine}' } | Out-Null`
+          ],
+          { stdio: 'ignore' }
+        );
+        return null;
+      } catch {}
+    }
+  }
   const child = spawn(process.execPath, [DAEMON_SCRIPT], {
     detached: true,
     stdio: 'ignore',
@@ -143,13 +164,17 @@ async function cmdInstall(args) {
 
   patchWindowsShortcuts(true);
   setupWindowsAutostart(true);
-  const pid = startDaemon();
+  let pid = startDaemon();
 
-  await new Promise((r) => setTimeout(r, 900));
+  for (let i = 0; i < 10 && !pid; i++) {
+    await new Promise((r) => setTimeout(r, 200));
+    pid = readDaemonPid();
+  }
+  await new Promise((r) => setTimeout(r, 700));
   const { port, targets } = await discoverAntigravityTargets();
 
   console.log(`\n✦ Antigravity Worldline instalado (${WORLDLINES[next.preset].name} · ${WORLDLINES[next.preset].divergence})`);
-  console.log(`  Demonio activo (PID ${pid})`);
+  console.log(`  Demonio activo (${pid ? `PID ${pid}` : 'en segundo plano'})`);
   if (port && targets.length > 0) {
     console.log(`  Conectado a Antigravity (puerto CDP ${port}) — tema aplicado en caliente.`);
   } else {

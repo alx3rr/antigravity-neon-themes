@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { WORLDLINES, DEFAULT_CONFIG, normalizeConfig, buildThemeCss } from './themes.mjs';
 import { createGeminiMetricsService } from './metrics.mjs';
 import { buildBrowserBundle } from './browser-bundle.mjs';
@@ -289,10 +290,12 @@ async function runDaemon() {
 
   await syncTargets();
 
-  const targetInterval = setInterval(syncTargets, 3500);
+  const targetInterval = setInterval(() => {
+    syncTargets().catch(() => {});
+  }, 1000);
   const metricsInterval = setInterval(() => {
     for (const sess of sessions.values()) {
-      pushMetrics(sess);
+      pushMetrics(sess).catch(() => {});
     }
   }, 2000);
 
@@ -307,12 +310,15 @@ async function runDaemon() {
     process.exit(0);
   };
 
+  process.on('uncaughtException', () => {});
+  process.on('unhandledRejection', () => {});
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
 }
 
 // Run when executed directly as a daemon process
-const isDirect = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'));
+const isDirect =
+  process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
 if (isDirect) {
   runDaemon();
 }
