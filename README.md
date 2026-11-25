@@ -34,25 +34,71 @@ Pasa el ratón (o haz clic para fijarlo) sobre la barra inferior del chat para v
 
 ## Requisitos
 * **Google Antigravity** (app de escritorio).
-* **Node.js ≥ 22.13.0** (usa `node:sqlite` y `WebSocket` nativos, cero dependencias).
+* **Node.js ≥ 22.13.0** — compruébalo con `node -v` (usa `node:sqlite` y `WebSocket` nativos; **no hace falta `npm install`**).
+* **Git** (o descargar el repositorio como ZIP desde GitHub).
 
-## Instalación
+## Instalación paso a paso
+
+> [!NOTE]
+> Clona el repositorio en una carpeta fija que no vayas a mover ni borrar (el demonio en segundo plano se ejecuta desde esa ruta al iniciar sesión). Si algún día cambias la carpeta de sitio, vuelve a ejecutar `node cli.mjs install` desde la nueva ubicación.
+
+### 1. Descarga el proyecto
+Abre una terminal (**PowerShell** en Windows o Terminal en macOS/Linux) y ejecuta:
 
 ```bash
 git clone https://github.com/alx3rr/antigravity-neon-themes.git
 cd antigravity-neon-themes
+```
+
+### 2. Instala y activa el tema
+```bash
 node cli.mjs install
+```
+
+*(Opcional)* Si quieres empezar directamente con un tema concreto, pasa `--preset`:
+
+```bash
+node cli.mjs install --preset border-translucent   # FG-009 · Obsidian Border
+node cli.mjs install --preset cyberpunk            # FG-010 · Cyberpunk (por defecto)
+node cli.mjs install --preset border-sunset        # FG-011 · Sunset
+```
+
+Qué hace `install` automáticamente:
+* Guarda tus preferencias en `~/.antigravity-worldline/config.json`.
+* Arranca el demonio ligero en segundo plano.
+* En **Windows**, añade `--remote-debugging-port=0` a los accesos directos de Antigravity y configura el inicio automático para que el tema se cargue siempre al abrir la app.
+
+### 3. Relanza Antigravity (solo la primera vez)
+Si la consola indica que Antigravity aún no expone el puerto CDP, ejecuta:
+
+```bash
 node cli.mjs relaunch
 ```
+
+Esto cerrará y volverá a abrir Antigravity con soporte CDP local (`--remote-debugging-port=0`) y aplicará el tema al instante. En Windows, a partir de aquí ya podrás abrir Antigravity normalmente desde su acceso directo.
+
+### 4. Verifica y personaliza
+Comprueba que el demonio y la ventana están conectados:
+
+```bash
+node cli.mjs status
+```
+
+Después abre **Settings → Neon Themes** dentro de Antigravity para cambiar entre los 3 **Future Gadgets**, elegir el **color de acento**, ajustar el **desenfoque (Blur)** y la **opacidad del panel** en tiempo real.
 
 ## Comandos
 
 ```bash
-node cli.mjs install     # Instala y activa el tema en vivo
+node cli.mjs install [--preset border-translucent|cyberpunk|border-sunset]  # Instala y activa el tema en vivo
 node cli.mjs relaunch    # Relanza Antigravity con soporte CDP local
-node cli.mjs status      # Comprueba el estado del demonio y la ventana
-node cli.mjs uninstall   # Desinstala todo y restaura Antigravity original
+node cli.mjs status      # Comprueba el estado del demonio, tema activo y ventana CDP
+node cli.mjs uninstall   # Desinstala todo, limpia el inicio automático y restaura Antigravity original
 ```
+
+## Solución de problemas rápida
+* **Al reiniciar Antigravity no sale el tema:** ejecuta `node cli.mjs status`. Si aparece `Puerto CDP: No detectado`, abre Antigravity desde su acceso directo actualizado (Escritorio / Menú Inicio) o ejecuta `node cli.mjs relaunch`.
+* **En Linux:** lanza Antigravity con `antigravity --remote-debugging-port=0` después de ejecutar `node cli.mjs install`.
+* **Desinstalación limpia:** ejecuta `node cli.mjs uninstall` antes de borrar la carpeta del proyecto para detener el demonio y restaurar los accesos directos originales.
 
 ---
 
