@@ -359,16 +359,9 @@ html[data-wl-active="1"] .shrink-0.flex.bg-sidebar {
   -webkit-backdrop-filter: none !important;
 }
 
-/* Smooth fade into Windows native caption overlay (- [] X) */
+/* Keep top menu bar clean & transparent (no harsh fade seam) */
 html[data-wl-active="1"] [data-testid="title-menu-bar"] {
-  background: linear-gradient(
-    to right,
-    transparent 0%,
-    transparent calc(100% - 260px),
-    rgba(17, 17, 20, 0.45) calc(100% - 190px),
-    rgba(17, 17, 20, 0.88) calc(100% - 148px),
-    #111114 calc(100% - 134px)
-  ) !important;
+  background: transparent !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
@@ -475,14 +468,80 @@ html[data-wl-active="1"] .agy-user-bubble [data-testid="user-message-content"] {
   box-shadow: none !important;
 }
 
-/* Diffs, tool cards & code blocks harmonized with active theme */
+/* Diffs, tool cards & Proposal #3 stylized neon code blocks */
 html[data-wl-active="1"] .monaco-diff-editor,
-html[data-wl-active="1"] [data-testid="tool-call-card"],
-html[data-wl-active="1"] pre {
+html[data-wl-active="1"] [data-testid="tool-call-card"] {
   background: var(--wl-code-bg) !important;
   border: 1px solid var(--wl-border) !important;
   border-radius: 12px !important;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+}
+
+html[data-wl-active="1"] :is([data-testid="conversation-view"], [data-markdown-root], .prose) div:has(> pre):not(:has(> pre:only-child)) {
+  background: var(--wl-code-bg) !important;
+  border: 1px solid var(--wl-border-strong) !important;
+  border-top: 2px solid var(--wl-accent) !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+
+html[data-wl-active="1"] :is([data-testid="conversation-view"], [data-markdown-root], .prose) div:has(> pre):not(:has(> pre:only-child)) > :first-child:not(pre) {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-bottom: 1px solid var(--wl-border) !important;
+  padding: 6px 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+html[data-wl-active="1"] :is([data-testid="conversation-view"], [data-markdown-root], .prose) div:has(> pre):not(:has(> pre:only-child)) > :first-child:not(pre)::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ff5f56;
+  box-shadow: 15px 0 0 #ffbd2e, 30px 0 0 #27c93f;
+  margin-right: 36px;
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+html[data-wl-active="1"] :is([data-testid="conversation-view"], [data-markdown-root], .prose) div:has(> pre):not(:has(> pre:only-child)) > :first-child:not(pre) > span:first-child {
+  font-family: 'JetBrains Mono', Consolas, monospace !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
+  color: var(--wl-accent-2) !important;
+}
+
+html[data-wl-active="1"] :is([data-testid="conversation-view"], [data-markdown-root], .prose) div:has(> pre):not(:has(> pre:only-child)) > :first-child:not(pre) button {
+  border: 1px solid var(--wl-border) !important;
+  border-radius: 7px !important;
+  padding: 2px 8px !important;
+  color: var(--wl-text) !important;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease !important;
+}
+
+html[data-wl-active="1"] :is([data-testid="conversation-view"], [data-markdown-root], .prose) div:has(> pre):not(:has(> pre:only-child)) > :first-child:not(pre) button:hover {
+  border-color: var(--wl-accent) !important;
+  box-shadow: 0 0 10px var(--wl-accent-soft) !important;
+}
+
+html[data-wl-active="1"] pre {
+  background: var(--wl-code-bg) !important;
+  border: 1px solid var(--wl-border-strong) !important;
+  border-top: 2px solid var(--wl-accent) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+}
+
+html[data-wl-active="1"] :is([data-testid="conversation-view"], [data-markdown-root], .prose) div:has(> pre):not(:has(> pre:only-child)) > pre {
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  margin: 0 !important;
 }
 
 /* Markdown headings & links */
@@ -528,6 +587,51 @@ html[data-wl-active="1"] [data-wl-model="hydrogen"] { color: #38bdf8 !important;
 html[data-wl-active="1"] [data-wl-model="flash"] { color: #fbbf24 !important; font-weight: 600 !important; }
 html[data-wl-active="1"] [data-wl-model="claude"] { color: #fb923c !important; font-weight: 600 !important; }
 html[data-wl-active="1"] [data-wl-model="gpt"] { color: #34d399 !important; font-weight: 600 !important; }
+html[data-wl-active="1"] [data-wl-model="gemini"] { color: #60a5fa !important; font-weight: 600 !important; }
+
+/* View Usage Quota Bars & Remaining Percentage Colors */
+html[data-wl-active="1"] [data-wl-usage-bar] {
+  border-radius: 999px !important;
+  transition: width 0.25s ease !important;
+}
+html[data-wl-active="1"] [data-wl-usage-bar="neon"],
+html[data-wl-active="1"] [data-wl-usage-bar="gemini"] {
+  background: linear-gradient(90deg, #00f5ff 0%, #a855f7 55%, #ff2e97 100%) !important;
+  box-shadow: 0 0 10px rgba(0, 245, 255, 0.40) !important;
+}
+html[data-wl-active="1"] [data-wl-usage-bar="carbon"] {
+  background: linear-gradient(90deg, #94a3b8 0%, #5eead4 100%) !important;
+  box-shadow: 0 0 8px rgba(94, 234, 212, 0.35) !important;
+}
+html[data-wl-active="1"] [data-wl-usage-bar="argon"] {
+  background: linear-gradient(90deg, #6366f1 0%, #a855f7 100%) !important;
+  box-shadow: 0 0 8px rgba(129, 140, 248, 0.38) !important;
+}
+html[data-wl-active="1"] [data-wl-usage-bar="hydrogen"] {
+  background: linear-gradient(90deg, #0ea5e9 0%, #38bdf8 100%) !important;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.38) !important;
+}
+html[data-wl-active="1"] [data-wl-usage-bar="flash"] {
+  background: linear-gradient(90deg, #f59e0b 0%, #fde047 100%) !important;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.38) !important;
+}
+html[data-wl-active="1"] [data-wl-usage-bar="claude"] {
+  background: linear-gradient(90deg, #ea580c 0%, #fb923c 100%) !important;
+  box-shadow: 0 0 8px rgba(251, 146, 60, 0.38) !important;
+}
+html[data-wl-active="1"] [data-wl-usage-bar="gpt"] {
+  background: linear-gradient(90deg, #059669 0%, #34d399 100%) !important;
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.38) !important;
+}
+
+html[data-wl-active="1"] [data-wl-usage-pct="neon"],
+html[data-wl-active="1"] [data-wl-usage-pct="gemini"] { color: #00f5ff !important; font-weight: 700 !important; }
+html[data-wl-active="1"] [data-wl-usage-pct="carbon"] { color: #5eead4 !important; font-weight: 700 !important; }
+html[data-wl-active="1"] [data-wl-usage-pct="argon"] { color: #a5b4fc !important; font-weight: 700 !important; }
+html[data-wl-active="1"] [data-wl-usage-pct="hydrogen"] { color: #38bdf8 !important; font-weight: 700 !important; }
+html[data-wl-active="1"] [data-wl-usage-pct="flash"] { color: #fbbf24 !important; font-weight: 700 !important; }
+html[data-wl-active="1"] [data-wl-usage-pct="claude"] { color: #fb923c !important; font-weight: 700 !important; }
+html[data-wl-active="1"] [data-wl-usage-pct="gpt"] { color: #34d399 !important; font-weight: 700 !important; }
 
 /* Reasoning Effort Colors (Low / Medium / High / Extra High) */
 html[data-wl-active="1"] [data-wl-effort="low"] { color: #4ade80 !important; font-weight: 600 !important; }
@@ -861,44 +965,18 @@ ${presetExtra}
 .wl-models-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
   margin-top: 8px;
   padding-top: 8px;
   border-top: 1px solid var(--wl-border);
 }
-.wl-model-item {
-  width: 100%;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  padding: 4px 6px;
-  cursor: pointer;
-  text-align: left;
-  color: inherit;
-  transition: background 0.14s ease, border-color 0.14s ease;
-}
-.wl-model-item:hover,
-.wl-model-item[data-open="1"] {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: var(--wl-border);
-}
 .wl-model-row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
   font-size: 11px;
   color: var(--wl-text-muted);
 }
 .wl-model-row strong { color: var(--wl-text); font-weight: 600; }
-.wl-model-detail {
-  display: none;
-  margin-top: 3px;
-  font-size: 10.5px;
-  color: var(--wl-accent-2);
-}
-.wl-model-item[data-open="1"] .wl-model-detail {
-  display: block;
-}
 
 .wl-card-footer {
   display: flex;

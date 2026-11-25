@@ -28,9 +28,9 @@ export function buildBrowserBundle({ config, cssText }) {
   window.__wl_latest_metrics = null;
   window.__wl_last_cid = '';
 
-  // Remove stale Settings nodes so updated layout mounts cleanly
+  // Remove stale Settings & Metrics nodes so updated layout and listeners mount cleanly
   try {
-    for (const oldId of ['wl-settings-nav-btn', 'wl-settings-pane']) {
+    for (const oldId of ['wl-settings-nav-btn', 'wl-settings-pane', 'wl-metrics-pill', 'wl-metrics-popover']) {
       const el = document.getElementById(oldId);
       if (el) el.remove();
     }
@@ -71,12 +71,14 @@ export function buildBrowserBundle({ config, cssText }) {
       const el = document.getElementById(id);
       if (el) el.remove();
     }
-    document.querySelectorAll('[data-wl-model], [data-wl-effort], [data-wl-perm], [data-wl-view-usage], [data-wl-view-usage-label]').forEach((el) => {
+    document.querySelectorAll('[data-wl-model], [data-wl-effort], [data-wl-perm], [data-wl-view-usage], [data-wl-view-usage-label], [data-wl-usage-bar], [data-wl-usage-pct]').forEach((el) => {
       el.removeAttribute('data-wl-model');
       el.removeAttribute('data-wl-effort');
       el.removeAttribute('data-wl-perm');
       el.removeAttribute('data-wl-view-usage');
       el.removeAttribute('data-wl-view-usage-label');
+      el.removeAttribute('data-wl-usage-bar');
+      el.removeAttribute('data-wl-usage-pct');
     });
     document.querySelectorAll('svg[data-wl-logo-enhanced="1"]').forEach((svg) => {
       if (svg.dataset.wlOrigSvg) svg.innerHTML = svg.dataset.wlOrigSvg;
@@ -144,6 +146,7 @@ export function buildBrowserBundle({ config, cssText }) {
     if (/gemini\\s*\\d*(?:\\.\\d+)?\\s*argon/i.test(t)) return 'argon';
     if (/gemini\\s*\\d*(?:\\.\\d+)?\\s*hydrogen/i.test(t)) return 'hydrogen';
     if (/gemini\\s*\\d*(?:\\.\\d+)?\\s*flash/i.test(t)) return 'flash';
+    if (/\\bgemini\\b/i.test(t)) return 'gemini';
     if (/claude/i.test(t)) return 'claude';
     if (/\\bgpt\\b/i.test(t)) return 'gpt';
     return '';
@@ -250,6 +253,49 @@ export function buildBrowserBundle({ config, cssText }) {
         }
         tagEffortLabels(item);
       }
+
+      // Colorize model names, quota bars & remaining % inside View Usage / Models dialogs
+      const dialogs = document.querySelectorAll('[role="dialog"]');
+      for (const dlg of dialogs) {
+        dlg.querySelectorAll('[data-wl-usage-bar], [data-wl-usage-pct]').forEach((el) => {
+          el.removeAttribute('data-wl-usage-bar');
+          el.removeAttribute('data-wl-usage-pct');
+        });
+        const w = document.createTreeWalker(dlg, NodeFilter.SHOW_TEXT);
+        while (w.nextNode()) {
+          const node = w.currentNode;
+          const parentEl = node.parentElement;
+          if (!parentEl || parentEl.closest('#wl-settings-pane')) continue;
+          const val = (node.nodeValue || '').trim();
+          if (!val || val.length > 60) continue;
+          const kind = classifyModel(val);
+          if (!kind) continue;
+          parentEl.setAttribute('data-wl-model', kind);
+
+          // Find enclosing row/card that contains a progress bar or % text
+          let row = parentEl.parentElement;
+          for (let step = 0; step < 5 && row && row !== dlg; step++, row = row.parentElement) {
+            const hasBar = row.querySelector('[role="progressbar"], [style*="width:"]');
+            const hasPct = /\\d+\\s*%/.test(row.textContent || '');
+            if (!hasBar && !hasPct) continue;
+            row.querySelectorAll('[role="progressbar"] > div, [role="progressbar"] > span, [style*="width:"]').forEach((bar) => {
+              const r = bar.getBoundingClientRect();
+              if (r.height > 0 && r.height <= 18 && r.width > 0) {
+                bar.setAttribute('data-wl-usage-bar', kind);
+              }
+            });
+            const pw = document.createTreeWalker(row, NodeFilter.SHOW_TEXT);
+            while (pw.nextNode()) {
+              const pn = pw.currentNode;
+              const pTxt = (pn.nodeValue || '').trim();
+              if (/\\d+\\s*%/.test(pTxt) && pTxt.length <= 28 && pn.parentElement) {
+                pn.parentElement.setAttribute('data-wl-usage-pct', kind);
+              }
+            }
+            break;
+          }
+        }
+      }
     } catch {}
   }
 
@@ -266,6 +312,7 @@ export function buildBrowserBundle({ config, cssText }) {
             (n.querySelector && n.querySelector('[role="dialog"]'))
           ) {
             needSettings = true;
+            needModels = true;
           }
           if (
             (n.matches && n.matches('[role="menu"], [role="listbox"], [role="menuitem"], [role="menuitemradio"]')) ||
@@ -332,17 +379,7 @@ export function buildBrowserBundle({ config, cssText }) {
   // 4. Gemini Telemetry Pill + Hover / Click Popover
   let pinned = false;
   let hideTimer = null;
-  let openModelKey = '';
   let latestMetrics = window.__wl_latest_metrics || null;
-
-  function applyOpenModelState(pop) {
-    if (!pop || !openModelKey) return;
-    pop.querySelectorAll('.wl-model-item').forEach((el) => {
-      if (el.getAttribute('data-wl-model-key') === openModelKey) {
-        el.setAttribute('data-open', '1');
-      }
-    });
-  }
 
   function ensurePopover() {
     let pop = document.getElementById('wl-metrics-popover');
@@ -355,24 +392,6 @@ export function buildBrowserBundle({ config, cssText }) {
       });
       pop.addEventListener('mouseleave', () => {
         if (!pinned) scheduleHidePopover();
-      });
-      pop.addEventListener('click', (e) => {
-        const modelBtn = e.target && e.target.closest ? e.target.closest('.wl-model-item') : null;
-        if (!modelBtn) return;
-        e.preventDefault();
-        e.stopPropagation();
-        pinned = true;
-        const key = modelBtn.getAttribute('data-wl-model-key') || '';
-        const wasOpen = modelBtn.getAttribute('data-open') === '1';
-        pop.querySelectorAll('.wl-model-item[data-open="1"]').forEach((el) => el.removeAttribute('data-open'));
-        if (wasOpen) {
-          openModelKey = '';
-        } else {
-          openModelKey = key;
-          modelBtn.setAttribute('data-open', '1');
-        }
-        const pill = document.getElementById('wl-metrics-pill');
-        if (pill) positionPopover(pill, pop);
       });
     }
     return pop;
@@ -397,7 +416,6 @@ export function buildBrowserBundle({ config, cssText }) {
     if (!pop) return;
     if (latestMetrics && latestMetrics.popoverHtml) {
       pop.innerHTML = latestMetrics.popoverHtml;
-      applyOpenModelState(pop);
     }
     positionPopover(pill, pop);
     pop.setAttribute('data-visible', '1');
@@ -510,10 +528,11 @@ export function buildBrowserBundle({ config, cssText }) {
       pill.innerHTML = payload.pillHtml;
     }
     const pop = document.getElementById('wl-metrics-popover');
-    if (pop && pop.getAttribute('data-visible') === '1' && payload.popoverHtml) {
+    if (pop && payload.popoverHtml) {
       pop.innerHTML = payload.popoverHtml;
-      applyOpenModelState(pop);
-      if (pill) positionPopover(pill, pop);
+      if (pill && pop.getAttribute('data-visible') === '1') {
+        positionPopover(pill, pop);
+      }
     }
   };
 
@@ -746,6 +765,10 @@ export function buildBrowserBundle({ config, cssText }) {
     const cid = getActiveCascadeId();
     if (cid !== window.__wl_last_cid) {
       window.__wl_last_cid = cid;
+      latestMetrics = null;
+      window.__wl_latest_metrics = null;
+      const pop = document.getElementById('wl-metrics-popover');
+      if (pop) pop.innerHTML = '';
       if (typeof window.__wlRequestMetrics === 'function') {
         try { window.__wlRequestMetrics(cid); } catch {}
       }
