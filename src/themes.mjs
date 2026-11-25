@@ -579,9 +579,12 @@ ${translucentExtra}
 }
 
 #wl-settings-pane {
-  padding: 24px 28px;
+  padding: 24px 28px 36px;
   color: var(--wl-text);
-  max-width: 680px;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  overflow-y: auto;
 }
 .wl-sp-title {
   font-size: 20px;

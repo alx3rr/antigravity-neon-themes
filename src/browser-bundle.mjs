@@ -25,6 +25,36 @@ export function buildBrowserBundle({ config, cssText }) {
     try { window.__wl_cleanup(); } catch {}
   }
 
+  // Remove stale Worldline Settings nodes so updated layout mounts cleanly
+  try {
+    for (const oldId of ['wl-settings-nav-btn', 'wl-settings-pane']) {
+      const el = document.getElementById(oldId);
+      if (el) el.remove();
+    }
+    document.querySelectorAll('[data-wl-hidden="1"]').forEach((el) => {
+      el.style.display = '';
+      el.removeAttribute('data-wl-hidden');
+    });
+    document.querySelectorAll('[data-wl-nav-bound="1"]').forEach((el) => el.removeAttribute('data-wl-nav-bound'));
+  } catch {}
+
+  // Clean any leftover DOM artifacts from previously uninstalled third-party themes
+  try {
+    for (const staleId of [
+      'ag-live-metrics-pill',
+      'ag-side-metrics-pill',
+      'ag-live-metrics-tooltip',
+      'ag-turn-metrics-tooltip',
+      'ag-codex-theme',
+      'ag-user-theme-vars',
+      'ag-user-custom-style'
+    ]) {
+      const el = document.getElementById(staleId);
+      if (el) el.remove();
+    }
+    document.querySelectorAll('.ag-live-metrics-pill, .ag-turn-metrics').forEach((el) => el.remove());
+  } catch {}
+
   const cfg = boot.config || {};
   const root = document.documentElement;
   const cleanups = [];
@@ -158,6 +188,27 @@ export function buildBrowserBundle({ config, cssText }) {
   document.addEventListener('click', onDocClick, true);
   cleanups.push(() => document.removeEventListener('click', onDocClick, true));
 
+  function findComposerFooterRow(inputBox, modelTrigger) {
+    let row = modelTrigger.parentElement;
+    for (let i = 0; i < 8 && row && row !== inputBox; i++, row = row.parentElement) {
+      try {
+        const cs = window.getComputedStyle(row);
+        const isRow = cs && cs.display.includes('flex') && cs.flexDirection.startsWith('row');
+        if (isRow && row.children.length >= 2) {
+          const leftGroup = row.children[0];
+          if (leftGroup && leftGroup.contains(modelTrigger)) {
+            const leftCs = window.getComputedStyle(leftGroup);
+            if (leftCs && leftCs.display.includes('flex') && leftCs.flexDirection.startsWith('row')) {
+              return leftGroup;
+            }
+          }
+          return row;
+        }
+      } catch {}
+    }
+    return modelTrigger.parentElement;
+  }
+
   function mountMetricsPill() {
     const existing = document.getElementById('wl-metrics-pill');
     if (!cfg.showMetrics) {
@@ -193,9 +244,18 @@ export function buildBrowserBundle({ config, cssText }) {
       });
     }
 
-    const hostRow = modelTrigger.parentElement;
-    if (pill.parentElement !== hostRow) {
-      hostRow.appendChild(pill);
+    const hostRow = findComposerFooterRow(inputBox, modelTrigger);
+    if (hostRow && pill.parentElement !== hostRow) {
+      if (hostRow.children.length >= 2 && !hostRow.contains(modelTrigger.closest('button') === hostRow.lastElementChild ? null : null)) {
+        const refRight = hostRow.lastElementChild;
+        if (refRight && !refRight.contains(modelTrigger) && hostRow.children.length >= 2 && refRight !== pill) {
+          hostRow.insertBefore(pill, refRight);
+        } else {
+          hostRow.appendChild(pill);
+        }
+      } else {
+        hostRow.appendChild(pill);
+      }
     }
 
     if (latestMetrics && latestMetrics.pillHtml && pill.innerHTML !== latestMetrics.pillHtml) {
@@ -265,82 +325,136 @@ export function buildBrowserBundle({ config, cssText }) {
     );
   }
 
+  function findSettingsColumns(dialog, anchorBtn) {
+    let cur = anchorBtn.parentElement;
+    while (cur && cur !== dialog) {
+      const parent = cur.parentElement;
+      if (!parent || parent === document.body) break;
+      const curRect = cur.getBoundingClientRect();
+      const kids = Array.from(parent.children).filter((el) => el.nodeType === 1 && el.id !== 'wl-settings-pane');
+      const idx = kids.indexOf(cur);
+      if (idx >= 0 && kids.length >= 2) {
+        const rightCol = kids.find((k, i) => {
+          if (i <= idx) return false;
+          const r = k.getBoundingClientRect();
+          return r.width >= 300 && r.width >= curRect.width * 1.2;
+        });
+        if (rightCol) {
+          return { leftCol: cur, rightCol };
+        }
+      }
+      cur = parent;
+    }
+    return null;
+  }
+
+  function isDialogCloseBtn(el) {
+    if (!el || el.nodeType !== 1) return false;
+    if (el.tagName === 'BUTTON') {
+      const lbl = String(el.getAttribute('aria-label') || '').toLowerCase();
+      const rect = el.getBoundingClientRect();
+      if (lbl.includes('close') || lbl.includes('cerrar') || (rect.width > 0 && rect.width <= 44 && rect.height <= 44)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   function mountSettingsEntry() {
     const dialog = document.querySelector('[role="dialog"]');
     if (!dialog) return;
 
-    // Look for Appearance nav button inside the Settings modal
     const navButtons = Array.from(dialog.querySelectorAll('button, a'));
     const appearanceBtn = navButtons.find((b) => /^Appearance$/i.test((b.textContent || '').trim()));
     if (!appearanceBtn || !appearanceBtn.parentElement) return;
 
-    const navContainer = appearanceBtn.parentElement;
-    if (document.getElementById('wl-settings-nav-btn')) return;
+    const layout = findSettingsColumns(dialog, appearanceBtn);
+    if (!layout) return;
+    const { leftCol, rightCol } = layout;
 
-    const btn = document.createElement('button');
-    btn.id = 'wl-settings-nav-btn';
-    btn.type = 'button';
-    btn.innerHTML = '<span>✦</span><span>Worldline</span>';
-    navContainer.appendChild(btn);
+    // Place the Worldline button cleanly right after "Browser" (or "Appearance" if not found)
+    const browserBtn = navButtons.find((b) => /^Browser$/i.test((b.textContent || '').trim()));
+    const navList = (browserBtn && browserBtn.parentElement) || appearanceBtn.parentElement;
 
-    const openWorldlinePane = () => {
-      const contentHost = navContainer.parentElement && navContainer.parentElement.nextElementSibling;
-      if (!contentHost) return;
-      btn.setAttribute('data-active', '1');
-      Array.from(contentHost.children).forEach((ch) => {
-        if (ch.id !== 'wl-settings-pane') ch.style.display = 'none';
+    let btn = document.getElementById('wl-settings-nav-btn');
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.id = 'wl-settings-nav-btn';
+      btn.type = 'button';
+      btn.innerHTML = '<span>✦</span><span>Worldline</span>';
+      navList.appendChild(btn);
+
+      const closeWorldlinePane = () => {
+        btn.removeAttribute('data-active');
+        const pane = document.getElementById('wl-settings-pane');
+        if (pane) pane.style.display = 'none';
+        Array.from(rightCol.children).forEach((ch) => {
+          if (ch.id !== 'wl-settings-pane' && ch.getAttribute('data-wl-hidden') === '1') {
+            ch.style.display = '';
+            ch.removeAttribute('data-wl-hidden');
+          }
+        });
+      };
+
+      const openWorldlinePane = () => {
+        btn.setAttribute('data-active', '1');
+        Array.from(rightCol.children).forEach((ch) => {
+          if (ch.id === 'wl-settings-pane' || isDialogCloseBtn(ch)) return;
+          if (ch.style.display !== 'none') {
+            ch.setAttribute('data-wl-hidden', '1');
+            ch.style.display = 'none';
+          }
+        });
+        let pane = document.getElementById('wl-settings-pane');
+        if (!pane || pane.parentElement !== rightCol) {
+          if (pane) pane.remove();
+          pane = document.createElement('div');
+          pane.id = 'wl-settings-pane';
+          rightCol.appendChild(pane);
+          pane.addEventListener('click', (ev) => {
+            const presetBtn = ev.target.closest('[data-wl-pick-preset]');
+            if (presetBtn) {
+              cfg.preset = presetBtn.getAttribute('data-wl-pick-preset');
+              sendConfigPatch({ preset: cfg.preset });
+              pane.innerHTML = renderSettingsPaneHtml();
+              return;
+            }
+            const accentBtn = ev.target.closest('[data-wl-pick-accent]');
+            if (accentBtn) {
+              cfg.accent = accentBtn.getAttribute('data-wl-pick-accent');
+              sendConfigPatch({ accent: cfg.accent });
+              pane.innerHTML = renderSettingsPaneHtml();
+              return;
+            }
+            const toggleBtn = ev.target.closest('[data-wl-toggle]');
+            if (toggleBtn) {
+              const key = toggleBtn.getAttribute('data-wl-toggle');
+              cfg[key] = !cfg[key];
+              sendConfigPatch({ [key]: cfg[key] });
+              pane.innerHTML = renderSettingsPaneHtml();
+            }
+          });
+        }
+        pane.style.display = 'block';
+        pane.innerHTML = renderSettingsPaneHtml();
+      };
+
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openWorldlinePane();
       });
-      let pane = document.getElementById('wl-settings-pane');
-      if (!pane) {
-        pane = document.createElement('div');
-        pane.id = 'wl-settings-pane';
-        contentHost.appendChild(pane);
-        pane.addEventListener('click', (ev) => {
-          const presetBtn = ev.target.closest('[data-wl-pick-preset]');
-          if (presetBtn) {
-            cfg.preset = presetBtn.getAttribute('data-wl-pick-preset');
-            sendConfigPatch({ preset: cfg.preset });
-            pane.innerHTML = renderSettingsPaneHtml();
-            return;
-          }
-          const accentBtn = ev.target.closest('[data-wl-pick-accent]');
-          if (accentBtn) {
-            cfg.accent = accentBtn.getAttribute('data-wl-pick-accent');
-            sendConfigPatch({ accent: cfg.accent });
-            pane.innerHTML = renderSettingsPaneHtml();
-            return;
-          }
-          const toggleBtn = ev.target.closest('[data-wl-toggle]');
-          if (toggleBtn) {
-            const key = toggleBtn.getAttribute('data-wl-toggle');
-            cfg[key] = !cfg[key];
-            sendConfigPatch({ [key]: cfg[key] });
-            pane.innerHTML = renderSettingsPaneHtml();
+
+      if (!leftCol.getAttribute('data-wl-nav-bound')) {
+        leftCol.setAttribute('data-wl-nav-bound', '1');
+        leftCol.addEventListener('click', (e) => {
+          if (e.target && e.target.closest && e.target.closest('#wl-settings-nav-btn')) return;
+          if (e.target && e.target.closest && e.target.closest('button, a')) {
+            closeWorldlinePane();
           }
         });
       }
-      pane.style.display = 'block';
-      pane.innerHTML = renderSettingsPaneHtml();
-    };
-
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      openWorldlinePane();
-    });
-
-    navContainer.addEventListener('click', (e) => {
-      if (e.target.closest('#wl-settings-nav-btn')) return;
-      btn.removeAttribute('data-active');
-      const pane = document.getElementById('wl-settings-pane');
-      if (pane) pane.style.display = 'none';
-      const contentHost = navContainer.parentElement && navContainer.parentElement.nextElementSibling;
-      if (contentHost) {
-        Array.from(contentHost.children).forEach((ch) => {
-          if (ch.id !== 'wl-settings-pane') ch.style.display = '';
-        });
-      }
-    });
+    }
   }
 
   // 6. Lightweight periodic sync for SPA navigation & Settings modal
