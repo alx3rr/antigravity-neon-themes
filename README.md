@@ -87,6 +87,7 @@ Después abre **Settings → Neon Themes** dentro de Antigravity para elegir tem
 
 ```bash
 node cli.mjs install     # Instala y activa el tema en vivo
+node cli.mjs update      # Descarga la última versión desde GitHub y recarga el tema
 node cli.mjs relaunch    # Relanza Antigravity con soporte CDP local
 node cli.mjs status      # Comprueba si el tema y el puerto CDP están activos
 node cli.mjs uninstall   # Desinstala todo y restaura Antigravity de fábrica

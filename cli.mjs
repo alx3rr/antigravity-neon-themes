@@ -260,9 +260,48 @@ async function cmdStatus() {
   console.log('');
 }
 
+async function cmdUpdate() {
+  if (!fs.existsSync(path.join(__dirname, '.git'))) {
+    console.error('Esta carpeta no fue clonada con Git. Descarga la última versión desde GitHub o clona el repositorio con git clone.');
+    process.exit(1);
+  }
+
+  let before = '';
+  try {
+    before = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: __dirname, encoding: 'utf8' }).trim();
+  } catch {}
+
+  console.log('Comprobando actualizaciones en GitHub...');
+  try {
+    execFileSync('git', ['pull', '--ff-only'], { cwd: __dirname, stdio: 'inherit' });
+  } catch {
+    console.error('No se pudo actualizar con git pull --ff-only. Comprueba tu conexión o si tienes cambios locales sin guardar.');
+    process.exit(1);
+  }
+
+  let after = before;
+  try {
+    after = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: __dirname, encoding: 'utf8' }).trim();
+  } catch {}
+
+  if (before && after && before !== after) {
+    console.log(`\n✓ Actualizado (${before} → ${after}). Recargando tema y demonio...`);
+  } else {
+    console.log(`\n✓ Ya tenías la última versión (${after || 'main'}). Recargando tema y demonio...`);
+  }
+
+  // Spawn fresh Node process so any updated cli.mjs / src/*.mjs files are loaded from disk
+  execFileSync(process.execPath, [path.join(__dirname, 'cli.mjs'), 'install'], {
+    cwd: __dirname,
+    stdio: 'inherit'
+  });
+}
+
 const [cmd = 'help', ...rest] = process.argv.slice(2);
 if (cmd === 'install') {
   await cmdInstall(rest);
+} else if (cmd === 'update') {
+  await cmdUpdate();
 } else if (cmd === 'uninstall') {
   await cmdUninstall();
 } else if (cmd === 'relaunch') {
@@ -273,6 +312,7 @@ if (cmd === 'install') {
   console.log(`
 Antigravity · Neon Themes · Comandos:
   node cli.mjs install [--preset border-translucent|cyberpunk|border-sunset]
+  node cli.mjs update
   node cli.mjs relaunch
   node cli.mjs status
   node cli.mjs uninstall

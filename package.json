@@ -6,6 +6,7 @@
   "main": "cli.mjs",
   "scripts": {
     "install-theme": "node cli.mjs install",
+    "update-theme": "node cli.mjs update",
     "uninstall-theme": "node cli.mjs uninstall",
     "relaunch": "node cli.mjs relaunch",
     "status": "node cli.mjs status"
