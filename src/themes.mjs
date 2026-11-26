@@ -224,7 +224,13 @@ export function buildThemeCss(config) {
     }
   }
 
-  const varDecls = Object.entries(vars)
+  const wlVarDecls = Object.entries(vars)
+    .filter(([k]) => k.startsWith('--wl-'))
+    .map(([k, v]) => `  ${k}: ${v};`)
+    .join('\n');
+
+  const nativeVarDecls = Object.entries(vars)
+    .filter(([k]) => !k.startsWith('--wl-'))
     .map(([k, v]) => `  ${k}: ${v};`)
     .join('\n');
 
@@ -292,13 +298,16 @@ html[data-wl-preset="cyberpunk"] [id="antigravity.agentSidePanelInputBox"]:focus
 `;
 
   return `/* Antigravity · Neon Themes · ${wl.name} */
-:root,
+:root {
+${wlVarDecls}
+}
+
 html[data-wl-active="1"],
 html[data-wl-active="1"] body,
 html[data-wl-active="1"] body[data-agy-theme],
 html[data-wl-active="1"] .agy-shell,
 html[data-wl-active="1"] .agy-inset-shell {
-${varDecls}
+${nativeVarDecls}
 }
 
 ${fontCss}
@@ -1019,6 +1028,44 @@ ${presetExtra}
   border: 1px solid var(--wl-border);
   border-radius: 12px;
   padding: 11px 14px;
+}
+.wl-master-card {
+  border-color: var(--wl-border-strong);
+  background: linear-gradient(135deg, var(--wl-accent-soft), var(--wl-surface-2));
+  margin-bottom: 16px;
+  gap: 12px;
+}
+.wl-master-card[data-on="0"] {
+  border-color: var(--wl-border);
+  background: var(--wl-surface-2);
+}
+.wl-status-pill {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: rgba(74, 222, 128, 0.16);
+  color: #4ade80;
+  border: 1px solid rgba(74, 222, 128, 0.42);
+}
+.wl-status-pill[data-on="0"] {
+  background: rgba(148, 163, 184, 0.16);
+  color: #cbd5e1;
+  border-color: rgba(148, 163, 184, 0.35);
+}
+.wl-controls-body {
+  transition: opacity 0.2s ease, filter 0.2s ease;
+}
+.wl-controls-body[data-disabled="1"] {
+  opacity: 0.42;
+  filter: grayscale(0.45);
+  pointer-events: none;
+  user-select: none;
 }
 .wl-toggle-title { font-weight: 600; font-size: 13px; }
 .wl-toggle-desc { font-size: 11.5px; color: var(--wl-text-muted); margin-top: 2px; }

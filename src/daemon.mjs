@@ -9,8 +9,25 @@ import { WORLDLINES, DEFAULT_CONFIG, normalizeConfig, buildThemeCss } from './th
 import { createGeminiMetricsService } from './metrics.mjs';
 import { buildBrowserBundle } from './browser-bundle.mjs';
 
-export function getDataDir() {
+export function getLegacyDataDir() {
   return path.join(os.homedir(), '.antigravity-worldline');
+}
+
+export function getDataDir() {
+  return path.join(os.homedir(), '.antigravity-neon-themes');
+}
+
+export function migrateLegacyDataDir() {
+  const legacyDir = getLegacyDataDir();
+  const nextDir = getDataDir();
+  const legacyCfg = path.join(legacyDir, 'config.json');
+  const nextCfg = path.join(nextDir, 'config.json');
+  try {
+    if (fs.existsSync(legacyCfg) && !fs.existsSync(nextCfg)) {
+      fs.mkdirSync(nextDir, { recursive: true });
+      fs.copyFileSync(legacyCfg, nextCfg);
+    }
+  } catch {}
 }
 
 export function getConfigPath() {
@@ -26,6 +43,7 @@ export function getConversationsDir() {
 }
 
 export function loadConfig() {
+  migrateLegacyDataDir();
   try {
     const raw = JSON.parse(fs.readFileSync(getConfigPath(), 'utf8'));
     return normalizeConfig(raw);
@@ -197,7 +215,7 @@ class CdpSession {
 export async function injectDisabledOnce() {
   const { targets } = await discoverAntigravityTargets();
   const disableScript = buildBrowserBundle({
-    config: { ...DEFAULT_CONFIG, enabled: false },
+    config: { ...DEFAULT_CONFIG, enabled: false, uninstall: true },
     cssText: ''
   });
   for (const t of targets) {

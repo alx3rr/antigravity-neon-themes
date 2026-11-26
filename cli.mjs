@@ -10,6 +10,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { WORLDLINES, DEFAULT_CONFIG } from './src/themes.mjs';
 import {
   getDataDir,
+  getLegacyDataDir,
   getPidPath,
   loadConfig,
   saveConfig,
@@ -50,9 +51,15 @@ function patchWindowsShortcuts(enable) {
 
 function setupWindowsAutostart(enable) {
   if (process.platform !== 'win32') return;
-  const vbsPath = path.join(getDataDir(), 'AntigravityWorldline.vbs');
+  const vbsPath = path.join(getDataDir(), 'AntigravityNeonThemes.vbs');
   const regKey = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run';
-  const regName = 'AntigravityWorldline';
+  const regName = 'AntigravityNeonThemes';
+  const legacyRegName = 'AntigravityWorldline';
+
+  // Always clean legacy registry autostart entry if present
+  try {
+    execFileSync('reg.exe', ['delete', regKey, '/v', legacyRegName, '/f'], { stdio: 'ignore' });
+  } catch {}
 
   if (enable) {
     fs.mkdirSync(getDataDir(), { recursive: true });
@@ -114,7 +121,7 @@ function stopDaemon() {
 function startDaemon() {
   stopDaemon();
   if (process.platform === 'win32') {
-    const vbsPath = path.join(getDataDir(), 'AntigravityWorldline.vbs');
+    const vbsPath = path.join(getDataDir(), 'AntigravityNeonThemes.vbs');
     if (fs.existsSync(vbsPath)) {
       const cmdLine = `wscript.exe "${vbsPath}"`.replace(/'/g, "''");
       try {
@@ -177,6 +184,11 @@ async function cmdInstall(args) {
 
   patchWindowsShortcuts(true);
   setupWindowsAutostart(true);
+  // Remove legacy ~/.antigravity-worldline directory after config migration
+  try {
+    const legacyDir = getLegacyDataDir();
+    if (fs.existsSync(legacyDir)) fs.rmSync(legacyDir, { recursive: true, force: true });
+  } catch {}
   let pid = startDaemon();
 
   for (let i = 0; i < 10 && !pid; i++) {
@@ -204,6 +216,9 @@ async function cmdUninstall() {
   patchWindowsShortcuts(false);
   try {
     fs.rmSync(getDataDir(), { recursive: true, force: true });
+  } catch {}
+  try {
+    fs.rmSync(getLegacyDataDir(), { recursive: true, force: true });
   } catch {}
   console.log('✓ Desinstalado por completo. Antigravity restaurado a su estado original.');
 }

@@ -76,15 +76,16 @@ export function buildBrowserBundle({ config, cssText }) {
   } catch {}
 
   const cfg = boot.config || {};
+  const isEnabled = cfg.enabled !== false;
   const root = document.documentElement;
   root.removeAttribute('data-wl-animated-bg');
   const cleanups = [];
 
-  if (!cfg.enabled) {
+  const resetVisualModAttributes = () => {
     root.removeAttribute('data-wl-active');
     root.removeAttribute('data-wl-preset');
     root.removeAttribute('data-wl-running');
-    for (const id of ['wl-theme-style', 'wl-metrics-pill', 'wl-metrics-popover', 'wl-settings-nav-btn', 'wl-settings-pane']) {
+    for (const id of ['wl-metrics-pill', 'wl-metrics-popover']) {
       const el = document.getElementById(id);
       if (el) el.remove();
     }
@@ -100,12 +101,32 @@ export function buildBrowserBundle({ config, cssText }) {
       svg.removeAttribute('data-wl-logo-enhanced');
       delete svg.dataset.wlOrigSvg;
     });
+  };
+
+  if (cfg.uninstall) {
+    resetVisualModAttributes();
+    for (const id of ['wl-theme-style', 'wl-settings-nav-btn', 'wl-settings-pane']) {
+      const el = document.getElementById(id);
+      if (el) el.remove();
+    }
     return;
   }
 
-  // 1. Mount CSS & theme attributes
-  root.setAttribute('data-wl-active', '1');
-  root.setAttribute('data-wl-preset', cfg.preset || 'cyberpunk');
+  let styleEl = document.getElementById('wl-theme-style');
+  if (!styleEl) {
+    styleEl = document.createElement('style');
+    styleEl.id = 'wl-theme-style';
+    (document.head || root).appendChild(styleEl);
+  }
+  styleEl.textContent = boot.cssText || '';
+
+  if (!isEnabled) {
+    resetVisualModAttributes();
+  } else {
+    // 1. Mount CSS & theme attributes
+    root.setAttribute('data-wl-active', '1');
+    root.setAttribute('data-wl-preset', cfg.preset || 'cyberpunk');
+  }
 
   // 1a. Enhance top-left Antigravity vector logo with authentic rainbow gradient
   function enhanceAntigravityLogo() {
@@ -297,21 +318,13 @@ export function buildBrowserBundle({ config, cssText }) {
           }
         }
       }
-      if (needLogo) enhanceAntigravityLogo();
+      if (needLogo && isEnabled) enhanceAntigravityLogo();
       if (needSettings) mountSettingsEntry();
-      if (needModels) tagModelElements();
+      if (needModels && isEnabled) tagModelElements();
     });
     uiObserver.observe(document.body, { childList: true, subtree: true });
     cleanups.push(() => uiObserver.disconnect());
   }
-
-  let styleEl = document.getElementById('wl-theme-style');
-  if (!styleEl) {
-    styleEl = document.createElement('style');
-    styleEl.id = 'wl-theme-style';
-    (document.head || root).appendChild(styleEl);
-  }
-  styleEl.textContent = boot.cssText || '';
 
   function sendConfigPatch(patch) {
     if (typeof window.__wlUpdateConfig === 'function') {
@@ -488,7 +501,7 @@ export function buildBrowserBundle({ config, cssText }) {
   }
 
   window.__wl_render_metrics = (payload) => {
-    if (!payload) return;
+    if (!isEnabled || !payload) return;
     latestMetrics = payload;
     window.__wl_latest_metrics = payload;
     root.setAttribute('data-wl-running', payload.isRunning ? '1' : '0');
@@ -547,8 +560,14 @@ export function buildBrowserBundle({ config, cssText }) {
     const panelOpacity = Number.isFinite(Number(cfg.panelOpacity)) ? Number(cfg.panelOpacity) : 72;
 
     return (
-      '<h2 class="wl-sp-title"><span class="wl-dot"></span><span>Antigravity · Neon Themes</span> <span class="wl-div-badge">' + activeWl.code + '</span></h2>' +
+      '<h2 class="wl-sp-title"><span class="wl-dot"></span><span>Antigravity · Neon Themes</span> <span class="wl-div-badge">' + (isEnabled ? activeWl.code : 'OFF') + '</span></h2>' +
       '<p class="wl-sp-sub">Personaliza la apariencia de Antigravity y el medidor de tokens Gemini al instante.</p>' +
+      '<div class="wl-toggle-row wl-master-card" data-on="' + (isEnabled ? '1' : '0') + '">' +
+      '<div><div class="wl-toggle-title">Activar Antigravity · Neon Themes <span class="wl-status-pill" data-on="' + (isEnabled ? '1' : '0') + '">' + (isEnabled ? 'ACTIVO' : 'PREDETERMINADO') + '</span></div>' +
+      '<div class="wl-toggle-desc">Apágalo para volver al aspecto predeterminado de Antigravity al instante sin desinstalar nada.</div></div>' +
+      '<button type="button" class="wl-switch" data-wl-toggle="enabled" data-on="' + (isEnabled ? '1' : '0') + '"></button>' +
+      '</div>' +
+      '<div class="wl-controls-body" data-disabled="' + (isEnabled ? '0' : '1') + '">' +
       '<div class="wl-sp-section">Future Gadgets</div>' +
       '<div class="wl-preset-grid">' + presetCards + '</div>' +
       '<div class="wl-sp-section">Color de acento</div>' +
@@ -562,6 +581,7 @@ export function buildBrowserBundle({ config, cssText }) {
       '<div class="wl-toggle-list">' +
       toggleRow('showMetrics', 'Barra de tokens Gemini', 'Muestra memoria libre del chat y gráfica semanal de los modelos Gemini.', cfg.showMetrics) +
       toggleRow('cleanFont', 'Tipografía limpia', 'Usa Inter / JetBrains Mono para texto y bloques de código.', cfg.cleanFont) +
+      '</div>' +
       '</div>'
     );
   }
@@ -673,6 +693,13 @@ export function buildBrowserBundle({ config, cssText }) {
             const toggleBtn = ev.target.closest('[data-wl-toggle]');
             if (toggleBtn) {
               const key = toggleBtn.getAttribute('data-wl-toggle');
+              if (key === 'enabled') {
+                const nextEnabled = cfg.enabled === false;
+                cfg.enabled = nextEnabled;
+                sendConfigPatch({ enabled: nextEnabled });
+                pane.innerHTML = renderSettingsPaneHtml();
+                return;
+              }
               cfg[key] = !cfg[key];
               sendConfigPatch({ [key]: cfg[key] });
               pane.innerHTML = renderSettingsPaneHtml();
@@ -736,10 +763,11 @@ export function buildBrowserBundle({ config, cssText }) {
 
   // 6. Lightweight periodic sync for SPA navigation & Settings modal
   const tick = () => {
+    mountSettingsEntry();
+    if (!isEnabled) return;
     enhanceAntigravityLogo();
     tagModelElements();
     mountMetricsPill();
-    mountSettingsEntry();
     const cid = getActiveCascadeId();
     if (cid !== window.__wl_last_cid) {
       window.__wl_last_cid = cid;
