@@ -60,6 +60,13 @@
 * **Google Antigravity** (app de escritorio).
 * **[Git](https://git-scm.com/downloads)** y **[Node.js ≥ 22.13](https://nodejs.org)** instalados en el equipo (sin `npm install`, cero dependencias externas).
 
+Puedes instalar ambos en **PowerShell** con estos comandos:
+
+```powershell
+winget install --id Git.Git -e --source winget
+winget install --id OpenJS.NodeJS.LTS -e --source winget
+```
+
 > [!IMPORTANT]
 > **Si acabas de instalar Git o Node.js**, cierra la terminal y **abre una nueva ventana de PowerShell** (o Terminal) antes de ejecutar los comandos; si no, Windows seguirá diciendo que no reconoce `git` o `node`.
 

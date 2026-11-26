@@ -85,6 +85,7 @@ export function buildBrowserBundle({ config, cssText }) {
     root.removeAttribute('data-wl-active');
     root.removeAttribute('data-wl-preset');
     root.removeAttribute('data-wl-running');
+    root.removeAttribute('data-wl-doc-hidden');
     for (const id of ['wl-metrics-pill', 'wl-metrics-popover']) {
       const el = document.getElementById(id);
       if (el) el.remove();
@@ -234,6 +235,9 @@ export function buildBrowserBundle({ config, cssText }) {
       const triggers = document.querySelectorAll('[data-testid="model-selector-trigger"]');
       for (const trig of triggers) {
         const raw = trig.getAttribute('data-model-label') || trig.textContent || '';
+        const sig = 'm:' + raw;
+        if (trig.__wlSig === sig) continue;
+        trig.__wlSig = sig;
         const kind = classifyModel(raw);
         trig.querySelectorAll('[data-wl-model], [data-wl-effort]').forEach((el) => {
           el.removeAttribute('data-wl-model');
@@ -248,7 +252,11 @@ export function buildBrowserBundle({ config, cssText }) {
 
       const permTrigs = document.querySelectorAll('[data-testid="permissions-selector-trigger"]');
       for (const pt of permTrigs) {
-        const pKind = classifyPermission(pt.textContent || '');
+        const raw = pt.textContent || '';
+        const sig = 'p:' + raw;
+        if (pt.__wlSig === sig) continue;
+        pt.__wlSig = sig;
+        const pKind = classifyPermission(raw);
         if (pKind) pt.setAttribute('data-wl-perm', pKind);
         else pt.removeAttribute('data-wl-perm');
       }
@@ -256,6 +264,9 @@ export function buildBrowserBundle({ config, cssText }) {
       const menuItems = document.querySelectorAll('[role="menu"] [role="menuitem"], [role="menu"] [role="menuitemradio"], [role="listbox"] [role="option"]');
       for (const item of menuItems) {
         const txt = (item.textContent || '').trim();
+        const sig = 'i:' + txt;
+        if (item.__wlSig === sig) continue;
+        item.__wlSig = sig;
         item.querySelectorAll('[data-wl-model], [data-wl-effort], [data-wl-view-usage-label]').forEach((el) => {
           el.removeAttribute('data-wl-model');
           el.removeAttribute('data-wl-effort');
@@ -291,39 +302,74 @@ export function buildBrowserBundle({ config, cssText }) {
   }
 
   if (document.body && typeof MutationObserver !== 'undefined') {
+    let pendModels = false;
+    let pendSettings = false;
+    let pendLogo = false;
+    let flushTimer = 0;
+
+    const flushObserver = () => {
+      flushTimer = 0;
+      const doLogo = pendLogo && isEnabled;
+      const doSettings = pendSettings;
+      const doModels = pendModels && isEnabled;
+      pendLogo = false;
+      pendSettings = false;
+      pendModels = false;
+      if (doLogo) enhanceAntigravityLogo();
+      if (doSettings) mountSettingsEntry();
+      if (doModels) tagModelElements();
+    };
+
+    const scheduleFlush = () => {
+      if (flushTimer) return;
+      if (typeof requestAnimationFrame === 'function') {
+        flushTimer = requestAnimationFrame(flushObserver);
+      } else {
+        flushTimer = setTimeout(flushObserver, 50);
+      }
+    };
+
     const uiObserver = new MutationObserver((muts) => {
-      let needModels = false;
-      let needSettings = false;
-      let needLogo = false;
+      let dirty = false;
       for (const m of muts) {
         for (const n of m.addedNodes) {
           if (n.nodeType !== 1) continue;
+          if (n.childElementCount === 0 && !n.hasAttribute('role') && !n.hasAttribute('data-testid')) continue;
           if (
             (n.matches && n.matches('[role="dialog"]')) ||
             (n.querySelector && n.querySelector('[role="dialog"]'))
           ) {
-            needSettings = true;
+            pendSettings = true;
+            dirty = true;
           }
           if (
-            (n.matches && n.matches('[role="menu"], [role="listbox"], [role="menuitem"], [role="menuitemradio"]')) ||
-            (n.querySelector && n.querySelector('[role="menu"], [role="listbox"], [data-testid="model-selector-trigger"], [data-testid="permissions-selector-trigger"]'))
+            isEnabled &&
+            ((n.matches && n.matches('[role="menu"], [role="listbox"], [role="menuitem"], [role="menuitemradio"], [data-testid="model-selector-trigger"], [data-testid="permissions-selector-trigger"]')) ||
+              (n.querySelector && n.querySelector('[role="menu"], [role="listbox"], [data-testid="model-selector-trigger"], [data-testid="permissions-selector-trigger"]')))
           ) {
-            needModels = true;
+            pendModels = true;
+            dirty = true;
           }
           if (
-            (n.matches && n.matches('[data-testid="app-icon-new-conversation-button"]')) ||
-            (n.querySelector && n.querySelector('[data-testid="app-icon-new-conversation-button"]'))
+            isEnabled &&
+            ((n.matches && n.matches('[data-testid="app-icon-new-conversation-button"]')) ||
+              (n.querySelector && n.querySelector('[data-testid="app-icon-new-conversation-button"]')))
           ) {
-            needLogo = true;
+            pendLogo = true;
+            dirty = true;
           }
         }
       }
-      if (needLogo && isEnabled) enhanceAntigravityLogo();
-      if (needSettings) mountSettingsEntry();
-      if (needModels && isEnabled) tagModelElements();
+      if (dirty) scheduleFlush();
     });
     uiObserver.observe(document.body, { childList: true, subtree: true });
-    cleanups.push(() => uiObserver.disconnect());
+    cleanups.push(() => {
+      uiObserver.disconnect();
+      if (flushTimer) {
+        if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(flushTimer);
+        else clearTimeout(flushTimer);
+      }
+    });
   }
 
   function sendConfigPatch(patch) {
@@ -451,6 +497,12 @@ export function buildBrowserBundle({ config, cssText }) {
     if (!cfg.showMetrics) {
       if (existing) existing.remove();
       closePopover();
+      return;
+    }
+    if (existing && existing.isConnected) {
+      if (latestMetrics && latestMetrics.pillHtml && existing.innerHTML !== latestMetrics.pillHtml) {
+        existing.innerHTML = latestMetrics.pillHtml;
+      }
       return;
     }
     const inputBox = document.getElementById('antigravity.agentSidePanelInputBox');
@@ -761,13 +813,9 @@ export function buildBrowserBundle({ config, cssText }) {
     }
   }
 
-  // 6. Lightweight periodic sync for SPA navigation & Settings modal
-  const tick = () => {
-    mountSettingsEntry();
+  // 6. Lightweight periodic sync for SPA navigation & visibility awareness
+  const syncConversationMetrics = () => {
     if (!isEnabled) return;
-    enhanceAntigravityLogo();
-    tagModelElements();
-    mountMetricsPill();
     const cid = getActiveCascadeId();
     if (cid !== window.__wl_last_cid) {
       window.__wl_last_cid = cid;
@@ -780,8 +828,45 @@ export function buildBrowserBundle({ config, cssText }) {
       }
     }
   };
-  tick();
-  const timer = setInterval(tick, 1200);
+
+  const tick = (force = false) => {
+    if (!force && document.hidden) return;
+    mountSettingsEntry();
+    if (!isEnabled) return;
+    enhanceAntigravityLogo();
+    tagModelElements();
+    mountMetricsPill();
+    syncConversationMetrics();
+  };
+
+  const syncVisibility = () => {
+    root.setAttribute('data-wl-doc-hidden', document.hidden ? '1' : '0');
+    if (!document.hidden) tick(true);
+  };
+  syncVisibility();
+  document.addEventListener('visibilitychange', syncVisibility);
+  cleanups.push(() => document.removeEventListener('visibilitychange', syncVisibility));
+
+  let switchTimer = 0;
+  const onSidebarChatSwitch = (e) => {
+    if (!isEnabled || !e.target || !e.target.closest) return;
+    if (e.target.closest('[data-testid="conversation-row-sidebar"], [data-testid="app-icon-new-conversation-button"]')) {
+      if (switchTimer) clearTimeout(switchTimer);
+      switchTimer = setTimeout(() => {
+        switchTimer = 0;
+        syncConversationMetrics();
+        mountMetricsPill();
+      }, 120);
+    }
+  };
+  document.addEventListener('click', onSidebarChatSwitch, true);
+  cleanups.push(() => {
+    document.removeEventListener('click', onSidebarChatSwitch, true);
+    if (switchTimer) clearTimeout(switchTimer);
+  });
+
+  tick(true);
+  const timer = setInterval(() => tick(false), 4000);
   cleanups.push(() => clearInterval(timer));
 
   window.__wl_cleanup = () => {

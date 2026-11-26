@@ -60,10 +60,10 @@ export function saveConfig(cfg) {
   return normalized;
 }
 
-export function getDevToolsPortCandidates() {
+export function getDevToolsPortInfo() {
   const candidates = [];
   const envPort = Number(process.env.WORLDLINE_CDP_PORT || 0);
-  if (envPort > 0) candidates.push(envPort);
+  if (envPort > 0) candidates.push({ port: envPort, mtimeMs: 0, isFilePort: false });
 
   const userDataDirs = [];
   if (process.platform === 'win32') {
@@ -76,25 +76,38 @@ export function getDevToolsPortCandidates() {
   }
 
   for (const dir of userDataDirs) {
+    const portFile = path.join(dir, 'DevToolsActivePort');
     try {
-      const text = fs.readFileSync(path.join(dir, 'DevToolsActivePort'), 'utf8');
+      const st = fs.statSync(portFile);
+      const text = fs.readFileSync(portFile, 'utf8');
       const firstLine = Number(String(text).split(/\r?\n/)[0].trim());
-      if (firstLine > 0 && firstLine < 65536 && !candidates.includes(firstLine)) {
-        candidates.push(firstLine);
+      if (firstLine > 0 && firstLine < 65536 && !candidates.some((c) => c.port === firstLine)) {
+        candidates.push({ port: firstLine, mtimeMs: st.mtimeMs, isFilePort: true });
       }
     } catch {}
   }
 
-  if (!candidates.includes(9222)) candidates.push(9222);
   return candidates;
 }
 
-export async function discoverAntigravityTargets() {
-  const ports = getDevToolsPortCandidates();
-  for (const port of ports) {
+export function getDevToolsPortCandidates() {
+  return getDevToolsPortInfo().map((c) => c.port);
+}
+
+export async function discoverAntigravityTargets(deadPortState = null) {
+  const candidates = getDevToolsPortInfo();
+  for (const { port, mtimeMs, isFilePort } of candidates) {
+    if (
+      deadPortState &&
+      isFilePort &&
+      deadPortState.port === port &&
+      deadPortState.mtimeMs === mtimeMs
+    ) {
+      continue;
+    }
     try {
       const res = await fetch(`http://127.0.0.1:${port}/json/list`, {
-        signal: AbortSignal.timeout(1200)
+        signal: AbortSignal.timeout(900)
       });
       if (!res.ok) continue;
       const list = await res.json();
@@ -109,9 +122,18 @@ export async function discoverAntigravityTargets() {
           !String(t.url || '').startsWith('data:')
       );
       if (pages.length > 0) {
+        if (deadPortState) {
+          deadPortState.port = 0;
+          deadPortState.mtimeMs = 0;
+        }
         return { port, targets: pages };
       }
-    } catch {}
+    } catch {
+      if (deadPortState && isFilePort) {
+        deadPortState.port = port;
+        deadPortState.mtimeMs = mtimeMs;
+      }
+    }
   }
   return { port: null, targets: [] };
 }
@@ -236,14 +258,25 @@ async function runDaemon() {
   let config = loadConfig();
   const metricsService = createGeminiMetricsService(getConversationsDir());
   const sessions = new Map();
+  const deadPortState = { port: 0, mtimeMs: 0 };
+  let cachedScriptKey = '';
+  let cachedScript = '';
+  let isSyncing = false;
+  let targetTimer = null;
+  let stopping = false;
 
   function buildCurrentScript() {
+    const key = JSON.stringify(config);
+    if (cachedScript && key === cachedScriptKey) return cachedScript;
     const cssText = buildThemeCss(config);
-    return buildBrowserBundle({ config, cssText });
+    cachedScript = buildBrowserBundle({ config, cssText });
+    cachedScriptKey = key;
+    return cachedScript;
   }
 
   async function pushMetrics(sess) {
-    if (!config.enabled || !config.showMetrics || sess.closed) return;
+    if (!config.enabled || !config.showMetrics || sess.closed || sess.pushInFlight) return;
+    sess.pushInFlight = true;
     try {
       if (!sess.cascadeId) {
         const res = await sess.evalJs('typeof window.__wl_get_cid === "function" ? window.__wl_get_cid() : ""');
@@ -251,11 +284,19 @@ async function runDaemon() {
       }
       const wl = WORLDLINES[config.preset] || WORLDLINES[DEFAULT_CONFIG.preset];
       const payload = metricsService.buildPayload(sess.cascadeId, wl.code || wl.divergence);
+      if (sess.lastPayloadRef === payload) return;
       const sig = JSON.stringify(payload);
-      if (sig === sess.lastMetricsSig) return;
+      if (sig === sess.lastMetricsSig) {
+        sess.lastPayloadRef = payload;
+        return;
+      }
       sess.lastMetricsSig = sig;
+      sess.lastPayloadRef = payload;
       await sess.evalJs(`window.__wl_render_metrics && window.__wl_render_metrics(${sig});`);
-    } catch {}
+    } catch {
+    } finally {
+      sess.pushInFlight = false;
+    }
   }
 
   async function injectAll() {
@@ -265,61 +306,81 @@ async function runDaemon() {
       try {
         await sess.evalJs(script);
         sess.lastMetricsSig = '';
+        sess.lastPayloadRef = null;
         await pushMetrics(sess);
       } catch {}
     }
   }
 
+  function scheduleNextSync(delayMs) {
+    if (stopping) return;
+    if (targetTimer) clearTimeout(targetTimer);
+    targetTimer = setTimeout(() => {
+      syncTargets().catch(() => {});
+    }, delayMs);
+  }
+
   async function syncTargets() {
-    const { targets } = await discoverAntigravityTargets();
-    const activeIds = new Set(targets.map((t) => t.id));
+    if (stopping || isSyncing) return;
+    isSyncing = true;
+    try {
+      const { targets } = await discoverAntigravityTargets(deadPortState);
+      const activeIds = new Set(targets.map((t) => t.id));
 
-    for (const [id, sess] of sessions.entries()) {
-      if (!activeIds.has(id) || sess.closed) {
-        sess.close();
-        sessions.delete(id);
-      }
-    }
-
-    const script = buildCurrentScript();
-    for (const target of targets) {
-      if (sessions.has(target.id)) continue;
-      const sess = new CdpSession(target, {
-        onConfigPatch: (patch) => {
-          config = saveConfig({ ...config, ...patch });
-          injectAll();
-        },
-        onMetricsRequest: (s) => {
-          pushMetrics(s);
-        },
-        onClose: (s) => {
-          sessions.delete(s.target.id);
+      for (const [id, sess] of sessions.entries()) {
+        if (!activeIds.has(id) || sess.closed) {
+          sess.close();
+          sessions.delete(id);
         }
-      });
-      try {
-        await sess.connect();
-        sessions.set(target.id, sess);
-        await sess.evalJs(script);
-        await pushMetrics(sess);
-      } catch {
-        sess.close();
       }
+
+      if (targets.length > 0) {
+        const script = buildCurrentScript();
+        for (const target of targets) {
+          if (sessions.has(target.id)) continue;
+          const sess = new CdpSession(target, {
+            onConfigPatch: (patch) => {
+              config = saveConfig({ ...config, ...patch });
+              injectAll();
+            },
+            onMetricsRequest: (s) => {
+              pushMetrics(s);
+            },
+            onClose: (s) => {
+              sessions.delete(s.target.id);
+              deadPortState.port = 0;
+              deadPortState.mtimeMs = 0;
+              scheduleNextSync(1500);
+            }
+          });
+          try {
+            await sess.connect();
+            sessions.set(target.id, sess);
+            await sess.evalJs(script);
+            await pushMetrics(sess);
+          } catch {
+            sess.close();
+          }
+        }
+      }
+    } finally {
+      isSyncing = false;
+      scheduleNextSync(sessions.size > 0 ? 12_000 : 4000);
     }
   }
 
   await syncTargets();
 
-  const targetInterval = setInterval(() => {
-    syncTargets().catch(() => {});
-  }, 1000);
   const metricsInterval = setInterval(() => {
+    if (!config.enabled || !config.showMetrics || sessions.size === 0) return;
     for (const sess of sessions.values()) {
       pushMetrics(sess).catch(() => {});
     }
-  }, 2000);
+  }, 3000);
 
   const shutdown = () => {
-    clearInterval(targetInterval);
+    stopping = true;
+    if (targetTimer) clearTimeout(targetTimer);
     clearInterval(metricsInterval);
     for (const sess of sessions.values()) sess.close();
     try {

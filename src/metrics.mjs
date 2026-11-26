@@ -58,12 +58,44 @@ function buildLast7DaysMeta(nowMs) {
   return days;
 }
 
-export function createGeminiMetricsService(conversationsDir) {
-  let weeklyCache = { ts: 0, data: null };
+function getDbStamp(dbPath) {
+  let dbSt;
+  try {
+    dbSt = fs.statSync(dbPath);
+  } catch {
+    return '';
+  }
+  let walMtime = 0;
+  let walSize = 0;
+  try {
+    const walSt = fs.statSync(`${dbPath}-wal`);
+    walMtime = walSt.mtimeMs;
+    walSize = walSt.size;
+  } catch {}
+  return `${Math.max(dbSt.mtimeMs, walMtime)}:${dbSt.size}:${walSize}`;
+}
 
-  function readWeeklySummary() {
+export function createGeminiMetricsService(conversationsDir) {
+  let weeklyCache = { ts: 0, dayTailKey: '', activeStamp: '', data: null };
+  const perDbWeeklyCache = new Map();
+  let lastChatCache = { cascadeId: '', stamp: '', result: null };
+  let lastPayloadCache = { key: '', payload: null };
+
+  function readWeeklySummary(activeCascadeId = '', activeChatStamp = '') {
     const now = Date.now();
-    if (weeklyCache.data && now - weeklyCache.ts < 20_000) {
+    const todayKey = getLocalDayKey(now);
+    const cacheAge = now - weeklyCache.ts;
+    const activeTurnSettled =
+      activeChatStamp &&
+      activeChatStamp !== weeklyCache.activeStamp &&
+      cacheAge >= 5_000;
+
+    if (
+      weeklyCache.data &&
+      weeklyCache.dayTailKey === todayKey &&
+      cacheAge < 45_000 &&
+      !activeTurnSettled
+    ) {
       return weeklyCache.data;
     }
 
@@ -83,65 +115,121 @@ export function createGeminiMetricsService(conversationsDir) {
         entries = [];
       }
 
+      const seenDbNames = new Set();
+
       for (const name of entries) {
         if (!name.endsWith('.db')) continue;
+        seenDbNames.add(name);
         const dbPath = path.join(conversationsDir, name);
-        let st;
-        try {
-          st = fs.statSync(dbPath);
-        } catch {
-          continue;
-        }
-        if (!st || st.mtimeMs < cutoffMs) continue;
+        const stamp = getDbStamp(dbPath);
+        if (!stamp) continue;
 
-        const fallbackBucketIdx = dayIndex.get(getLocalDayKey(st.mtimeMs));
-        let db;
-        try {
-          db = new DatabaseSync(dbPath, { readOnly: true, timeout: 120 });
-          const stepRows = db.prepare('SELECT idx, metadata FROM steps ORDER BY idx ASC').all();
-          const stepTsByIdx = new Map();
-          const stepIdxs = [];
-          for (const sr of stepRows) {
-            const ts = extractStepTimestampMs(sr.metadata);
-            if (ts > 0) {
-              stepTsByIdx.set(sr.idx, ts);
-              stepIdxs.push(sr.idx);
-            }
+        let cachedEntry = perDbWeeklyCache.get(name);
+        if (!cachedEntry || cachedEntry.stamp !== stamp) {
+          let st;
+          try {
+            st = fs.statSync(dbPath);
+          } catch {
+            continue;
           }
-          const resolveBucketIdx = (maxStepIdx) => {
-            if (maxStepIdx >= 0) {
-              if (stepTsByIdx.has(maxStepIdx)) {
-                return dayIndex.get(getLocalDayKey(stepTsByIdx.get(maxStepIdx)));
+          if (!st || st.mtimeMs < cutoffMs) {
+            perDbWeeklyCache.set(name, {
+              stamp,
+              tooOld: true,
+              dayTokens: null,
+              byModel: null,
+              totalTokens: 0,
+              totalGenerations: 0
+            });
+            continue;
+          }
+
+          const fallbackDayKey = getLocalDayKey(st.mtimeMs);
+          const entryDayTokens = new Map();
+          const entryByModel = new Map();
+          let entryTotal = 0;
+          let entryGens = 0;
+
+          let db;
+          try {
+            db = new DatabaseSync(dbPath, { readOnly: true, timeout: 120 });
+            const stepRows = db.prepare('SELECT idx, metadata FROM steps ORDER BY idx ASC').all();
+            const stepTsByIdx = new Map();
+            const stepIdxs = [];
+            for (const sr of stepRows) {
+              const ts = extractStepTimestampMs(sr.metadata);
+              if (ts > 0) {
+                stepTsByIdx.set(sr.idx, ts);
+                stepIdxs.push(sr.idx);
               }
-              for (let j = stepIdxs.length - 1; j >= 0; j--) {
-                if (stepIdxs[j] <= maxStepIdx) {
-                  return dayIndex.get(getLocalDayKey(stepTsByIdx.get(stepIdxs[j])));
+            }
+            const resolveDayKey = (maxStepIdx) => {
+              if (maxStepIdx >= 0) {
+                if (stepTsByIdx.has(maxStepIdx)) {
+                  return getLocalDayKey(stepTsByIdx.get(maxStepIdx));
+                }
+                for (let j = stepIdxs.length - 1; j >= 0; j--) {
+                  if (stepIdxs[j] <= maxStepIdx) {
+                    return getLocalDayKey(stepTsByIdx.get(stepIdxs[j]));
+                  }
                 }
               }
-            }
-            return fallbackBucketIdx;
-          };
+              return fallbackDayKey;
+            };
 
-          const rows = db.prepare('SELECT idx, data FROM gen_metadata ORDER BY idx ASC').all();
-          for (const row of rows) {
-            const p = parseGenMetadataRow(row);
-            if (!isGeminiModel(p.modelName)) continue;
-            const billed = p.inTok + p.outTok;
-            if (billed <= 0 && p.ctx <= 0) continue;
-            const tokCount = billed > 0 ? billed : p.outTok;
-            const bucketIdx = resolveBucketIdx(p.maxStepIdx);
-            if (bucketIdx === undefined) continue;
-            totalTokens += tokCount;
-            totalGenerations++;
-            byModel.set(p.modelName, (byModel.get(p.modelName) || 0) + tokCount);
-            days[bucketIdx].tokens += tokCount;
+            const rows = db.prepare('SELECT idx, data FROM gen_metadata ORDER BY idx ASC').all();
+            for (const row of rows) {
+              const p = parseGenMetadataRow(row);
+              if (!isGeminiModel(p.modelName)) continue;
+              const billed = p.inTok + p.outTok;
+              if (billed <= 0 && p.ctx <= 0) continue;
+              const tokCount = billed > 0 ? billed : p.outTok;
+              const dKey = resolveDayKey(p.maxStepIdx);
+              entryTotal += tokCount;
+              entryGens++;
+              entryByModel.set(p.modelName, (entryByModel.get(p.modelName) || 0) + tokCount);
+              entryDayTokens.set(dKey, (entryDayTokens.get(dKey) || 0) + tokCount);
+            }
+            cachedEntry = {
+              stamp,
+              tooOld: false,
+              dayTokens: entryDayTokens,
+              byModel: entryByModel,
+              totalTokens: entryTotal,
+              totalGenerations: entryGens
+            };
+            perDbWeeklyCache.set(name, cachedEntry);
+          } catch {
+            // Skip locked or unreadable DB files safely
+            cachedEntry = null;
+          } finally {
+            try {
+              db?.close();
+            } catch {}
           }
-        } catch {
-          // Skip locked or unreadable DB files safely
-        } finally {
-          try {
-            db?.close();
-          } catch {}
+        }
+
+        if (!cachedEntry || cachedEntry.tooOld) continue;
+        let dbHasActiveDay = false;
+        for (const [dKey, tok] of cachedEntry.dayTokens.entries()) {
+          const bIdx = dayIndex.get(dKey);
+          if (bIdx !== undefined) {
+            days[bIdx].tokens += tok;
+            totalTokens += tok;
+            dbHasActiveDay = true;
+          }
+        }
+        if (dbHasActiveDay) {
+          totalGenerations += cachedEntry.totalGenerations;
+          for (const [model, tok] of cachedEntry.byModel.entries()) {
+            byModel.set(model, (byModel.get(model) || 0) + tok);
+          }
+        }
+      }
+
+      for (const cachedKey of perDbWeeklyCache.keys()) {
+        if (!seenDbNames.has(cachedKey)) {
+          perDbWeeklyCache.delete(cachedKey);
         }
       }
     }
@@ -156,6 +244,7 @@ export function createGeminiMetricsService(conversationsDir) {
     const todayTokens = days[days.length - 1].tokens;
 
     const summary = {
+      ts: now,
       days,
       topModels,
       totalTokens,
@@ -163,18 +252,27 @@ export function createGeminiMetricsService(conversationsDir) {
       avgPerDay,
       todayTokens
     };
-    weeklyCache = { ts: now, data: summary };
+    weeklyCache = {
+      ts: now,
+      dayTailKey: todayKey,
+      activeStamp: activeChatStamp || `${activeCascadeId}`,
+      data: summary
+    };
     return summary;
   }
 
   function readCurrentChat(cascadeId) {
     const DatabaseSync = getDatabaseSync();
     if (!DatabaseSync || !cascadeId || !/^[0-9a-f-]{36}$/i.test(cascadeId)) {
-      return { hasData: false, isRunning: false };
+      return { hasData: false, isRunning: false, stamp: '' };
     }
     const dbPath = path.join(conversationsDir, `${cascadeId}.db`);
-    if (!fs.existsSync(dbPath)) {
-      return { hasData: false, isRunning: false };
+    const stamp = getDbStamp(dbPath);
+    if (!stamp) {
+      return { hasData: false, isRunning: false, stamp: '' };
+    }
+    if (lastChatCache.cascadeId === cascadeId && lastChatCache.stamp === stamp && lastChatCache.result) {
+      return lastChatCache.result;
     }
 
     let db;
@@ -203,46 +301,50 @@ export function createGeminiMetricsService(conversationsDir) {
         totalOut += p.outTok;
       }
 
+      let res;
       if (geminiItems.length === 0) {
-        return { hasData: false, isRunning };
-      }
-
-      const last = geminiItems[geminiItems.length - 1];
-      let contextLimit = 0;
-      for (let i = geminiItems.length - 1; i >= 0; i--) {
-        if (geminiItems[i].maxCtx > 0) {
-          contextLimit = geminiItems[i].maxCtx;
-          break;
+        res = { hasData: false, isRunning, stamp };
+      } else {
+        const last = geminiItems[geminiItems.length - 1];
+        let contextLimit = 0;
+        for (let i = geminiItems.length - 1; i >= 0; i--) {
+          if (geminiItems[i].maxCtx > 0) {
+            contextLimit = geminiItems[i].maxCtx;
+            break;
+          }
         }
+        if (!contextLimit) contextLimit = 512_000;
+
+        const streamTps = last.stream >= 0.12 ? last.outTok / last.stream : 0;
+        const e2eTps = last.totDur > 0 ? last.outTok / last.totDur : 0;
+        const tps = Math.round(streamTps > 0 && streamTps <= 3000 ? streamTps : e2eTps);
+        const usedPct = Math.min(100, Math.round((last.ctx / contextLimit) * 100));
+        const freePct = Math.max(0, 100 - usedPct);
+        const remainCtx = Math.max(0, contextLimit - last.ctx);
+        const cacheRate = totalPrompt > 0 ? ((totalCacheRead / totalPrompt) * 100).toFixed(1) : '0.0';
+
+        res = {
+          hasData: true,
+          isRunning,
+          stamp,
+          modelName: last.modelName,
+          tps,
+          lastOut: last.outTok,
+          totalOut,
+          totalIn,
+          ctxUsed: last.ctx,
+          contextLimit,
+          remainCtx,
+          usedPct,
+          freePct,
+          cacheRate,
+          calls: geminiItems.length
+        };
       }
-      if (!contextLimit) contextLimit = 512_000;
-
-      const streamTps = last.stream >= 0.12 ? last.outTok / last.stream : 0;
-      const e2eTps = last.totDur > 0 ? last.outTok / last.totDur : 0;
-      const tps = Math.round(streamTps > 0 && streamTps <= 3000 ? streamTps : e2eTps);
-      const usedPct = Math.min(100, Math.round((last.ctx / contextLimit) * 100));
-      const freePct = Math.max(0, 100 - usedPct);
-      const remainCtx = Math.max(0, contextLimit - last.ctx);
-      const cacheRate = totalPrompt > 0 ? ((totalCacheRead / totalPrompt) * 100).toFixed(1) : '0.0';
-
-      return {
-        hasData: true,
-        isRunning,
-        modelName: last.modelName,
-        tps,
-        lastOut: last.outTok,
-        totalOut,
-        totalIn,
-        ctxUsed: last.ctx,
-        contextLimit,
-        remainCtx,
-        usedPct,
-        freePct,
-        cacheRate,
-        calls: geminiItems.length
-      };
+      lastChatCache = { cascadeId, stamp, result: res };
+      return res;
     } catch {
-      return { hasData: false, isRunning: false };
+      return { hasData: false, isRunning: false, stamp };
     } finally {
       try {
         db?.close();
@@ -306,7 +408,11 @@ export function createGeminiMetricsService(conversationsDir) {
 
   function buildPayload(cascadeId, gadgetCode = 'FG-010') {
     const chat = readCurrentChat(cascadeId);
-    const weekly = readWeeklySummary();
+    const weekly = readWeeklySummary(cascadeId, chat.stamp || '');
+    const cacheKey = `${cascadeId || ''}|${gadgetCode}|${chat.stamp || ''}|${weekly.ts}`;
+    if (lastPayloadCache.key === cacheKey && lastPayloadCache.payload) {
+      return lastPayloadCache.payload;
+    }
 
     const level = !chat.hasData
       ? 'ok'
@@ -405,12 +511,14 @@ export function createGeminiMetricsService(conversationsDir) {
       </div>
     </div>`;
 
-    return {
+    const payload = {
       cid: cascadeId || '',
       isRunning: chat.isRunning,
       pillHtml,
       popoverHtml
     };
+    lastPayloadCache = { key: cacheKey, payload };
+    return payload;
   }
 
   return { buildPayload };

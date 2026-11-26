@@ -1124,5 +1124,18 @@ ${presetExtra}
   accent-color: var(--wl-accent);
   cursor: pointer;
 }
+
+/* Zero GPU animation drain while minimized/hidden or reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  html[data-wl-active="1"] * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+html[data-wl-doc-hidden="1"] *,
+html[data-wl-doc-hidden="1"] *::before,
+html[data-wl-doc-hidden="1"] *::after {
+  animation-play-state: paused !important;
+}
 `;
 }
